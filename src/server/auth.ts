@@ -1,11 +1,10 @@
-// src/server/auth.ts
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import NextAuth, { type DefaultSession } from "next-auth";
+import NextAuth from "next-auth";
+import type { DefaultSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "~/server/db";
 
-// Perbarui tipe data agar `role` dan `id` tersedia di sesi
 declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
@@ -14,7 +13,7 @@ declare module "next-auth" {
     } & DefaultSession["user"];
   }
   interface User {
-      role?: "Mahasiswa" | "StaffKampus" | "Organisasi";
+    role?: "Mahasiswa" | "StaffKampus" | "Organisasi";
   }
 }
 
@@ -27,7 +26,6 @@ declare module "@auth/core/jwt" {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
-    // Menyimpan `role` dan `id` di dalam token JWT
     jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -35,7 +33,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return token;
     },
-    // Mengambil data dari token JWT untuk digunakan di sisi klien
     session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
@@ -55,21 +52,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
         
-        // 1. Coba cari di tabel Organisasi
-        const organization = await db.organisasi.findUnique({ where: { email: credentials.email as string }});
+        const organization = await db.organisasi.findUnique({ 
+          where: { email: credentials.email as string }
+        });
         if (organization) {
-          const isValid = await bcrypt.compare(credentials.password as string, organization.password);
-          if (isValid) return { id: organization.id, name: organization.name, email: organization.email, image: organization.logo, role: "Organisasi" };
+          const isValid = await bcrypt.compare(
+            credentials.password as string,
+            organization.password
+          );
+          if (isValid) return {
+            id: organization.id,
+            name: organization.name,
+            email: organization.email,
+            image: organization.logo,
+            role: "Organisasi"
+          };
         }
 
-        // 2. Jika tidak ketemu, cari di tabel User (Mahasiswa/Staff)
-        const user = await db.user.findUnique({ where: { email: credentials.email as string }});
+        const user = await db.user.findUnique({ 
+          where: { email: credentials.email as string }
+        });
         if (user?.password) {
-          const isValid = await bcrypt.compare(credentials.password as string, user.password);
-          if (isValid) return { id: user.id, name: user.name, email: user.email, image: user.image, role: user.role };
+          const isValid = await bcrypt.compare(
+            credentials.password as string,
+            user.password
+          );
+          if (isValid) return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            role: user.role
+          };
         }
-        
-        // 3. Jika tidak ditemukan di mana pun, gagalkan login
         return null;
       }
     }),

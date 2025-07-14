@@ -11,7 +11,7 @@ const inter = Inter({
 
 export const metadata = {
   title: "UACAD",
-  description: "Sistem Informasi UACAD",
+  description: "Sistem Informasi Jadwal Kegiatan Mahasiswa dan Organisasi",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
@@ -23,9 +23,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${inter.variable}`}>
-        <NextAuthProvider>
-          <TRPCReactProvider>{children}</TRPCReactProvider>
-        </NextAuthProvider>
+        <TRPCReactProvider>
+          <NextAuthProvider>{children}</NextAuthProvider>
+        </TRPCReactProvider>
       </body>
     </html>
   );

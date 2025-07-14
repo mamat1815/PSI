@@ -1,10 +1,8 @@
 // src/app/(org-dashboard)/dashboard/page.tsx
-"use client";
-
-import { api } from "~/trpc/react";
-import { Plus, Loader2, CalendarDays } from "lucide-react";
+import { api } from "~/trpc/server";
+import { Plus, CalendarDays } from "lucide-react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { auth } from "~/server/auth";
 
 const EventCard = ({ event }: { event: { id: string, title: string, date: Date, location: string } }) => (
     <div className="p-4 rounded-lg border flex flex-col bg-white border-gray-200">
@@ -29,9 +27,11 @@ const SummaryChart = () => (
     </div>
 );
 
-export default function DashboardPage() {
-    const { data: session } = useSession();
-    const { data: activeEvents, isLoading } = api.event.getAll.useQuery();
+export default async function DashboardPage() {
+    const session = await auth();
+    // PERBAIKAN: Panggil prosedur langsung dari `api` dan gunakan `.query()`
+    const allEvents = await api.event.getAll.query();
+    const activeEvents = allEvents.filter(e => new Date(e.date) >= new Date());
     
     return (
         <div className="p-4 sm:p-6 md:p-8">
@@ -39,25 +39,20 @@ export default function DashboardPage() {
                 <h1 className="text-3xl font-bold text-gray-800">
                     Selamat Pagi, {session?.user?.name?.split(' ')[0] ?? 'Organisasi'}
                 </h1>
-                <Link href="/dashboard/manajemen" className="p-3 rounded-full bg-white shadow-md transition-transform hover:scale-110" aria-label="Buat Event Baru">
+                <Link href="/dashboard/manajemen" className="p-3 rounded-full bg-white shadow-md transition-transform hover:scale-110" aria-label="Buka Manajemen">
                     <Plus className="h-6 w-6 text-gray-800"/>
                 </Link>
             </header>
-
             <section>
                 <h2 className="text-xl font-semibold mb-4 text-gray-800">Event Aktif</h2>
-                {isLoading && <Loader2 className="animate-spin text-gray-400" />}
-                {!isLoading && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                        {activeEvents && activeEvents.length > 0 ? (
-                            activeEvents.map(event => <EventCard key={event.id} event={event} />)
-                        ) : (
-                            <p className="text-gray-500 col-span-full">Tidak ada event aktif saat ini.</p>
-                        )}
-                    </div>
-                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                    {activeEvents.length > 0 ? (
+                        activeEvents.map(event => <EventCard key={event.id} event={event} />)
+                    ) : (
+                        <p className="text-gray-500 col-span-full">Tidak ada event aktif saat ini.</p>
+                    )}
+                </div>
             </section>
-
             <section className="mt-8">
                  <h2 className="text-xl font-semibold mb-4 text-gray-800">Ringkasan</h2>
                  <SummaryChart />

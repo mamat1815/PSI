@@ -26,6 +26,7 @@ model Skill {
   id     String  @id @default(cuid())
   name   String  @unique
   events Event[] @relation("EventSkills")
+  users  User[]  @relation("UserSkills")
 }
 
 model Organisasi {
@@ -89,6 +90,18 @@ model Membership {
   @@id([userId, organizationId])
 }
 
+// ========= MODEL BARU UNTUK ASPIRASI =========
+model Aspirasi {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  category  String
+  sentiment String?
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+// ===========================================
+
 model User {
   id             String       @id @default(cuid())
   name           String?
@@ -97,7 +110,7 @@ model User {
   emailVerified  DateTime?
   image          String?
   password       String?
-  skills         String[]     @default([])
+  skills         Skill[]      @relation("UserSkills")
   role           Role         @default(Mahasiswa)
   accounts       Account[]
   sessions       Session[]
@@ -106,6 +119,7 @@ model User {
   events         Event[]      @relation("EventParticipants")
   feedback       Feedback[]
   committeeRoles Committee[]
+  aspirasi       Aspirasi[] // <-- Tambahkan relasi baru ini
 }
 
 model JadwalKuliah {

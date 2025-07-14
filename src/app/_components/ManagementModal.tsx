@@ -26,7 +26,7 @@ export default function ManagementModal({ isOpen, onClose, initialData = null }:
                 time: new Date(initialData.date ?? '').toTimeString().slice(0, 5) ?? '',
                 location: initialData.location,
             });
-            setSelectedSkills(initialData.skills.map((s: { name: string; id: string }) => ({ value: s.name, label: s.name })))
+            setSelectedSkills(initialData.skills.map((s: { name: string }) => ({ value: s.name, label: s.name })))
         } else {
             setFormData(initialFormData);
             setSelectedSkills([]);
@@ -34,6 +34,7 @@ export default function ManagementModal({ isOpen, onClose, initialData = null }:
     }, [initialData, isOpen]);
 
     const createEventMutation = api.event.create.useMutation({ onSuccess: () => { utils.event.getAll.invalidate(); onClose(); } });
+    const updateEventMutation = api.event.update.useMutation({ onSuccess: () => { utils.event.getAll.invalidate(); onClose(); } });
     const createSkillMutation = api.skill.create.useMutation({ onSuccess: () => { utils.skill.getAll.invalidate(); }});
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setFormData(prev => ({...prev, [e.target.name]: e.target.value}));
@@ -43,21 +44,27 @@ export default function ManagementModal({ isOpen, onClose, initialData = null }:
         const [hours, minutes] = formData.time.split(':').map(Number);
         const combinedDate = new Date(year ?? 0, (month ?? 0) - 1, day ?? 0, hours ?? 0, minutes ?? 0);
         
-        createEventMutation.mutate({
+        const payload = {
             ...formData,
             date: combinedDate,
-            skills: selectedSkills.map((s: { value: string; label: string }) => ({ name: s.value, id: s.value })),
+            skills: selectedSkills.map(s => ({ value: s.value, label: s.label })),
             status,
-        });
+        };
+        
+        if (initialData?.id) {
+            updateEventMutation.mutate({ id: initialData.id, ...payload });
+        } else {
+            createEventMutation.mutate(payload);
+        }
     };
     
     const handleCreateSkill = useCallback(async (inputValue: string) => {
         const newOption = { value: inputValue, label: inputValue };
-        setSelectedSkills(prev => [...(prev ?? []), newOption] as const);
+        setSelectedSkills((prev) => [...(prev ?? []), newOption]);
         await createSkillMutation.mutateAsync({ name: inputValue });
     }, [createSkillMutation]);
 
-    const isLoading = createEventMutation.isPending;
+    const isLoading = createEventMutation.isPending || updateEventMutation.isPending;
 
     if (!isOpen) return null;
 

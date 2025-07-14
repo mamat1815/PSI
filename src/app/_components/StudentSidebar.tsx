@@ -1,19 +1,18 @@
-// src/app/_components/OrganizationSidebar.tsx
+// src/app/_components/StudentSidebar.tsx
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, Settings, LogOut, BarChart } from "lucide-react";
+import { LayoutDashboard, Calendar, Settings, LogOut } from "lucide-react";
 
-export default function OrganizationSidebar() {
+export default function StudentSidebar() {
     const { data: session } = useSession();
     const pathname = usePathname();
 
     const navLinks = [
-        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-        { href: "/dashboard/manajemen", label: "Manajemen", icon: Calendar },
-        { href: "/dashboard/report", label: "Laporan", icon: BarChart },
+        { href: "/home", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/jadwal", label: "Jadwal Kuliah", icon: Calendar },
     ];
 
     return (
@@ -25,7 +24,7 @@ export default function OrganizationSidebar() {
                         <li key={link.href}>
                             <Link href={link.href}
                                 className={`flex items-center gap-4 px-4 py-3 my-2 rounded-lg font-semibold transition-colors duration-200 ${
-                                    pathname.startsWith(link.href) ? 'bg-white shadow-md' : 'hover:bg-white/50'
+                                    pathname === link.href ? 'bg-white shadow-md' : 'hover:bg-white/50'
                                 }`}
                             >
                                 <link.icon className="h-6 w-6" />
@@ -44,9 +43,8 @@ export default function OrganizationSidebar() {
                     />
                     <div className="flex-grow">
                         <p className="font-bold text-sm">{session?.user?.name}</p>
-                        <p className="text-xs">Organisasi</p>
+                        <p className="text-xs">Mahasiswa</p>
                     </div>
-                    <button className="p-2 rounded-full hover:bg-white/50"><Settings className="h-5 w-5"/></button>
                     <button onClick={() => signOut({ callbackUrl: '/' })} className="p-2 rounded-full hover:bg-white/50"><LogOut className="h-5 w-5"/></button>
                 </div>
             </div>
