@@ -89,19 +89,19 @@ const FeedbackModal = ({ isOpen, onClose, event }: {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-200">
                 <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">Berikan Feedback</h3>
                         <button
                             onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600"
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
                         >
                             <XCircle className="h-6 w-6" />
                         </button>
                     </div>
 
-                    <div className="mb-4">
+                    <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
                         <h4 className="font-medium text-gray-800 mb-2">{event.title}</h4>
                         <div className="flex items-center text-sm text-gray-600 mb-1">
                             <Calendar className="h-4 w-4 mr-2" />
@@ -145,7 +145,7 @@ const FeedbackModal = ({ isOpen, onClose, event }: {
                             value={comment}
                             onChange={(e) => setComment(e.target.value)}
                             placeholder="Bagikan pengalaman Anda mengikuti event ini..."
-                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none"
+                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent resize-none"
                             rows={4}
                         />
                     </div>
@@ -153,14 +153,14 @@ const FeedbackModal = ({ isOpen, onClose, event }: {
                     <div className="flex justify-end space-x-3">
                         <button
                             onClick={onClose}
-                            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                            className="px-4 py-2.5 text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
                         >
                             Batal
                         </button>
                         <button
                             onClick={handleSubmit}
                             disabled={rating === 0 || isSubmitting}
-                            className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                            className="px-4 py-2.5 bg-yellow-500 text-white rounded-xl hover:bg-yellow-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center font-medium transition-colors"
                         >
                             {isSubmitting && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>}
                             <Send className="h-4 w-4 mr-2" />
@@ -216,8 +216,8 @@ const EventCard = ({
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow">
-            <div className="p-6">
+        <div className="bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow border border-gray-100">
+            <div className="p-5">
                 <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
                         <div className="flex items-center justify-between mb-2">
@@ -257,11 +257,11 @@ const EventCard = ({
 
                 {event.skills.length > 0 && (
                     <div className="mb-4">
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                             {event.skills.map((skill, index) => (
                                 <span
                                     key={index}
-                                    className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                                    className="inline-block bg-blue-50 text-blue-700 text-xs px-2.5 py-1 rounded-full border border-blue-200"
                                 >
                                     {skill.name}
                                 </span>
@@ -272,7 +272,7 @@ const EventCard = ({
 
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
-                    className="flex items-center text-sm text-yellow-600 hover:text-yellow-700 mb-3"
+                    className="flex items-center text-sm text-yellow-600 hover:text-yellow-700 mb-3 transition-colors"
                 >
                     {isExpanded ? (
                         <>
@@ -288,7 +288,7 @@ const EventCard = ({
                 </button>
 
                 {isExpanded && (
-                    <div className="border-t pt-4 mb-4">
+                    <div className="border-t pt-4 mb-4 border-gray-100">
                         <p className="text-gray-700 text-sm leading-relaxed">
                             {event.description}
                         </p>
@@ -296,9 +296,9 @@ const EventCard = ({
                 )}
 
                 {!isUpcoming && participation.status === 'ACCEPTED' && (
-                    <div className="border-t pt-4">
+                    <div className="border-t pt-4 border-gray-100">
                         {hasGivenFeedback ? (
-                            <div className="bg-gray-50 p-4 rounded-lg">
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
                                 <div className="flex items-center justify-between mb-2">
                                     <h4 className="text-sm font-medium text-gray-700">Feedback Anda</h4>
                                     <div className="flex items-center">
@@ -329,7 +329,7 @@ const EventCard = ({
                         ) : (
                             <button
                                 onClick={() => onOpenFeedback(event)}
-                                className="w-full bg-yellow-500 text-white py-2 px-4 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                                className="w-full bg-yellow-500 text-white py-2.5 px-4 rounded-xl hover:bg-yellow-600 transition-colors flex items-center justify-center font-medium"
                             >
                                 <MessageSquare className="h-4 w-4 mr-2" />
                                 Berikan Feedback
@@ -428,45 +428,45 @@ export default function StudentEventsPage() {
     }
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Event Saya</h1>
+        <div className="p-4 max-w-6xl mx-auto">
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Event Saya</h1>
                 <p className="text-gray-600">Kelola event yang Anda ikuti dan berikan feedback</p>
             </div>
 
             {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Event Aktif</p>
+                            <p className="text-sm font-medium text-gray-600 mb-1">Event Aktif</p>
                             <p className="text-2xl font-bold text-gray-900">{activeEvents.length}</p>
                         </div>
-                        <div className="p-3 bg-green-100 rounded-full">
+                        <div className="p-3 bg-green-100 rounded-xl">
                             <Calendar className="h-6 w-6 text-green-600" />
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Event Selesai</p>
+                            <p className="text-sm font-medium text-gray-600 mb-1">Event Selesai</p>
                             <p className="text-2xl font-bold text-gray-900">{historyEvents.length}</p>
                         </div>
-                        <div className="p-3 bg-blue-100 rounded-full">
+                        <div className="p-3 bg-blue-100 rounded-xl">
                             <CheckCircle className="h-6 w-6 text-blue-600" />
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Total Event</p>
+                            <p className="text-sm font-medium text-gray-600 mb-1">Total Event</p>
                             <p className="text-2xl font-bold text-gray-900">{(activeEvents.length + historyEvents.length)}</p>
                         </div>
-                        <div className="p-3 bg-purple-100 rounded-full">
+                        <div className="p-3 bg-purple-100 rounded-xl">
                             <Star className="h-6 w-6 text-purple-600" />
                         </div>
                     </div>
@@ -474,13 +474,13 @@ export default function StudentEventsPage() {
             </div>
 
             {/* Tabs and Search */}
-            <div className="bg-white rounded-lg shadow-md mb-6">
-                <div className="p-6 border-b border-gray-200">
+            <div className="bg-white rounded-xl shadow-md mb-6 border border-gray-100">
+                <div className="p-5 border-b border-gray-200">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                        <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+                        <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl">
                             <button
                                 onClick={() => setActiveTab('active')}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                                     activeTab === 'active'
                                         ? 'bg-white text-yellow-600 shadow-sm'
                                         : 'text-gray-600 hover:text-yellow-600'
@@ -490,7 +490,7 @@ export default function StudentEventsPage() {
                             </button>
                             <button
                                 onClick={() => setActiveTab('history')}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                                className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${
                                     activeTab === 'history'
                                         ? 'bg-white text-yellow-600 shadow-sm'
                                         : 'text-gray-600 hover:text-yellow-600'
@@ -507,7 +507,7 @@ export default function StudentEventsPage() {
                                 placeholder="Cari event..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                                className="pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
                             />
                         </div>
                     </div>
@@ -517,7 +517,7 @@ export default function StudentEventsPage() {
             {/* Events List */}
             <div className="space-y-4">
                 {filteredEvents.length === 0 ? (
-                    <div className="bg-white rounded-lg shadow-md p-12 text-center">
+                    <div className="bg-white rounded-xl shadow-md p-12 text-center border border-gray-100">
                         <Calendar className="mx-auto h-16 w-16 text-gray-300 mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 mb-2">
                             {searchQuery ? 'Tidak ada event yang ditemukan' : 'Belum ada event'}

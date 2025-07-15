@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from "react";
 import { api } from "~/trpc/react";
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Award, Building, Search, Loader2, Send, CheckCircle, Filter, Users, Star, AlertTriangle, Info, X, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Award, Building, Search, Loader2, Send, CheckCircle, Filter, Users, Star, AlertTriangle, Info, X, ExternalLink, TrendingUp, BarChart3, PieChart, Activity } from "lucide-react";
 import Link from "next/link";
 import { checkEventConflict, formatConflictMessage, type ScheduleItem } from "~/utils/scheduleConflict";
 
@@ -1011,33 +1011,272 @@ const EventCard = ({ event }: { event: any }) => {
     );
 };
 
-const SkillWidget = () => {
-    const { data } = api.user.getSkills.useQuery();
+const EventStatsWidget = () => {
+    const { data: myEvents } = api.event.getStudentEvents.useQuery();
+    
+    const stats = useMemo(() => {
+        if (!myEvents) return {
+            total: 0,
+            accepted: 0,
+            pending: 0,
+            rejected: 0,
+            completed: 0,
+            upcoming: 0
+        };
+        
+        const now = new Date();
+        const completed = myEvents.filter(p => new Date(p.event.date) < now && p.status === 'ACCEPTED');
+        const upcoming = myEvents.filter(p => new Date(p.event.date) >= now && p.status === 'ACCEPTED');
+        
+        return {
+            total: myEvents.length,
+            accepted: myEvents.filter(p => p.status === 'ACCEPTED').length,
+            pending: myEvents.filter(p => p.status === 'PENDING').length,
+            rejected: myEvents.filter(p => p.status === 'REJECTED').length,
+            completed: completed.length,
+            upcoming: upcoming.length
+        };
+    }, [myEvents]);
+
     return (
-        <div>
-            <h2 className="text-xl font-semibold mb-4">Soft Skill Anda</h2>
-            <div className="p-4 bg-white rounded-lg shadow-md">
-                <div className="flex flex-wrap gap-2">
-                    {data?.skills.map(skill => <span key={skill.name} className="px-3 py-1 bg-yellow-100 text-yellow-800 text-sm rounded-full">{skill.name}</span>)}
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Statistik Event Anda</h3>
+                <BarChart3 className="h-5 w-5 text-yellow-500" />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-100">
+                    <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
+                    <div className="text-sm text-blue-700">Total Event</div>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg border border-green-100">
+                    <div className="text-2xl font-bold text-green-600">{stats.accepted}</div>
+                    <div className="text-sm text-green-700">Diterima</div>
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Event Selesai</span>
+                    <span className="font-medium">{stats.completed}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Event Mendatang</span>
+                    <span className="font-medium">{stats.upcoming}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Menunggu Konfirmasi</span>
+                    <span className="font-medium text-yellow-600">{stats.pending}</span>
                 </div>
             </div>
         </div>
     );
-}
+};
 
-const AspirationForm = () => {
-    const [category, setCategory] = useState('');
-    const [content, setContent] = useState('');
-    const mutation = api.aspiration.submit.useMutation();
-    const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); mutation.mutate({ category, content }); };
-    if (mutation.isSuccess) return <div className="p-6 bg-green-50 text-green-800 rounded-lg text-center">Terima kasih atas aspirasi Anda!</div>
+const ActivityChart = () => {
+    const { data: myEvents } = api.event.getStudentEvents.useQuery();
+    
+    const monthlyData = useMemo(() => {
+        if (!myEvents) return [];
+        
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        const currentYear = new Date().getFullYear();
+        const data = months.map(month => ({ month, events: 0 }));
+        
+        myEvents.forEach(participation => {
+            const eventDate = new Date(participation.event.date);
+            const monthIndex = eventDate.getMonth();
+            if (eventDate.getFullYear() === currentYear && 
+                participation.status === 'ACCEPTED' && 
+                monthIndex >= 0 && 
+                monthIndex < data.length) {
+                const monthData = data[monthIndex];
+                if (monthData) {
+                    monthData.events++;
+                }
+            }
+        });
+        
+        return data;
+    }, [myEvents]);
+
+    const maxEvents = Math.max(...monthlyData.map(d => d.events), 1);
+
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div><label className="text-sm font-medium">Kategori</label><select value={category} onChange={(e) => setCategory(e.target.value)} required className="mt-1 w-full p-2 border rounded-md bg-white"><option value="" disabled>Pilih kategori...</option><option>Akademik</option><option>Fasilitas Kampus</option><option>Kegiatan Mahasiswa</option><option>Lainnya</option></select></div>
-            <div><label className="text-sm font-medium">Sampaikan Aspirasi Anda</label><textarea value={content} onChange={(e) => setContent(e.target.value)} required rows={4} className="mt-1 w-full p-2 border rounded-md" placeholder="Tuliskan masukan atau ide Anda di sini..."></textarea></div>
-            {mutation.isError && <p className="text-sm text-red-600">{mutation.error.message}</p>}
-            <button type="submit" disabled={mutation.isPending} className="w-full flex justify-center py-2 px-4 rounded-md text-white bg-gray-800 hover:bg-gray-700">{mutation.isPending ? <Loader2 className="animate-spin"/> : <><Send className="h-4 w-4 mr-2"/> Kirim Aspirasi</>}</button>
-        </form>
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Aktivitas Tahunan</h3>
+                <Activity className="h-5 w-5 text-yellow-500" />
+            </div>
+            
+            <div className="flex items-end justify-between h-32 space-x-1">
+                {monthlyData.map((data, index) => (
+                    <div key={index} className="flex flex-col items-center flex-1">
+                        <div 
+                            className="w-full bg-yellow-400 rounded-t-sm min-h-[4px] transition-all duration-300 hover:bg-yellow-500"
+                            style={{ height: `${(data.events / maxEvents) * 100}%` }}
+                            title={`${data.month}: ${data.events} event`}
+                        />
+                        <span className="text-xs text-gray-500 mt-2">{data.month}</span>
+                    </div>
+                ))}
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="text-sm text-gray-600 text-center">
+                    Total event diterima tahun ini: <span className="font-medium">{monthlyData.reduce((sum, d) => sum + d.events, 0)}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SkillProgressWidget = () => {
+    const { data: userSkills } = api.user.getSkills.useQuery();
+    const { data: myEvents } = api.event.getStudentEvents.useQuery();
+    
+    const skillProgress = useMemo(() => {
+        if (!userSkills || !myEvents) return [];
+        
+        const completedEvents = myEvents.filter(p => 
+            new Date(p.event.date) < new Date() && p.status === 'ACCEPTED'
+        );
+        
+        return userSkills.skills.map(skill => {
+            const relatedEvents = completedEvents.filter(p => 
+                p.event.skills?.some((s: any) => s.name === skill.name)
+            );
+            
+            return {
+                name: skill.name,
+                events: relatedEvents.length,
+                progress: Math.min((relatedEvents.length / 5) * 100, 100) // Max 5 events = 100%
+            };
+        }).sort((a, b) => b.events - a.events);
+    }, [userSkills, myEvents]);
+
+    return (
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Progress Skill</h3>
+                <TrendingUp className="h-5 w-5 text-yellow-500" />
+            </div>
+            
+            {skillProgress.length > 0 ? (
+                <div className="space-y-4">
+                    {skillProgress.slice(0, 4).map((skill, index) => (
+                        <div key={index}>
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-medium text-gray-700">{skill.name}</span>
+                                <span className="text-xs text-gray-500">{skill.events} event</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div 
+                                    className="bg-gradient-to-r from-yellow-400 to-yellow-500 h-2 rounded-full transition-all duration-500"
+                                    style={{ width: `${skill.progress}%` }}
+                                />
+                            </div>
+                        </div>
+                    ))}
+                    
+                    {skillProgress.length === 0 && (
+                        <div className="text-center py-6">
+                            <Star className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                            <p className="text-gray-500 text-sm">Belum ada skill yang terdaftar</p>
+                        </div>
+                    )}
+                </div>
+            ) : (
+                <div className="text-center py-6">
+                    <Star className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500 text-sm">Belum ada data skill</p>
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ParticipationChart = () => {
+    const { data: myEvents } = api.event.getStudentEvents.useQuery();
+    
+    const participationData = useMemo(() => {
+        if (!myEvents) return { accepted: 0, pending: 0, rejected: 0 };
+        
+        return {
+            accepted: myEvents.filter(p => p.status === 'ACCEPTED').length,
+            pending: myEvents.filter(p => p.status === 'PENDING').length,
+            rejected: myEvents.filter(p => p.status === 'REJECTED').length
+        };
+    }, [myEvents]);
+
+    const total = participationData.accepted + participationData.pending + participationData.rejected;
+    
+    if (total === 0) {
+        return (
+            <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Status Partisipasi</h3>
+                    <PieChart className="h-5 w-5 text-yellow-500" />
+                </div>
+                <div className="text-center py-6">
+                    <PieChart className="h-12 w-12 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-500 text-sm">Belum ada event yang didaftarkan</p>
+                </div>
+            </div>
+        );
+    }
+
+    const acceptedPercentage = (participationData.accepted / total) * 100;
+    const pendingPercentage = (participationData.pending / total) * 100;
+    const rejectedPercentage = (participationData.rejected / total) * 100;
+
+    return (
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-100">
+            <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Status Partisipasi</h3>
+                <PieChart className="h-5 w-5 text-yellow-500" />
+            </div>
+            
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <span className="text-sm text-gray-600">Diterima</span>
+                    </div>
+                    <span className="text-sm font-medium">{acceptedPercentage.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-green-500 h-2 rounded-full" style={{ width: `${acceptedPercentage}%` }} />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                        <span className="text-sm text-gray-600">Menunggu</span>
+                    </div>
+                    <span className="text-sm font-medium">{pendingPercentage.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-yellow-500 h-2 rounded-full" style={{ width: `${pendingPercentage}%` }} />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                        <span className="text-sm text-gray-600">Ditolak</span>
+                    </div>
+                    <span className="text-sm font-medium">{rejectedPercentage.toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="bg-red-500 h-2 rounded-full" style={{ width: `${rejectedPercentage}%` }} />
+                </div>
+            </div>
+            
+            <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+                <span className="text-sm text-gray-600">Total: {total} event</span>
+            </div>
+        </div>
     );
 };
 
@@ -1063,20 +1302,91 @@ export default function HomePage() {
             .slice(0, 5); // Ambil maksimal 5 event terdekat
     }, [myEvents]);
 
+    // Dashboard statistics
+    const dashboardStats = useMemo(() => {
+        if (!myEvents) return {
+            totalEvents: 0,
+            acceptedEvents: 0,
+            upcomingEvents: 0,
+            completedEvents: 0
+        };
+        
+        const now = new Date();
+        const accepted = myEvents.filter(p => p.status === 'ACCEPTED');
+        const upcoming = accepted.filter(p => new Date(p.event.date) >= now);
+        const completed = accepted.filter(p => new Date(p.event.date) < now);
+        
+        return {
+            totalEvents: myEvents.length,
+            acceptedEvents: accepted.length,
+            upcomingEvents: upcoming.length,
+            completedEvents: completed.length
+        };
+    }, [myEvents]);
+
     const tabs = [
         { id: 'home' as const, name: 'Beranda', icon: Building },
         { id: 'search' as const, name: 'Cari Event', icon: Search },
     ];
 
     return (
-        <div className="p-8">
-            <header className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold text-gray-800">
-                    Selamat Pagi, {session?.user?.name?.split(' ')[0] || 'Mahasiswa'}!
-                </h1>
-                <div className="flex items-center gap-4">
-                    <button className="p-3 rounded-full bg-white shadow-md"><Building className="h-6 w-6 text-gray-600"/></button>
-                    <button className="p-3 rounded-full bg-white shadow-md"><Search className="h-6 w-6 text-gray-600"/></button>
+        <div className="p-6">
+            <header className="mb-8">
+                <div className="flex justify-between items-center mb-6">
+                    <h1 className="text-3xl font-bold text-gray-800">
+                        Selamat Pagi, {session?.user?.name?.split(' ')[0] || 'Mahasiswa'}!
+                    </h1>
+                    <div className="flex items-center gap-4">
+                        <button className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow">
+                            <Building className="h-6 w-6 text-gray-600"/>
+                        </button>
+                        <button className="p-3 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow">
+                            <Search className="h-6 w-6 text-gray-600"/>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Dashboard Overview Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-4 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-blue-100 text-sm">Total Event</p>
+                                <p className="text-2xl font-bold">{dashboardStats.totalEvents}</p>
+                            </div>
+                            <Calendar className="h-8 w-8 text-blue-200" />
+                        </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl p-4 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-green-100 text-sm">Event Diterima</p>
+                                <p className="text-2xl font-bold">{dashboardStats.acceptedEvents}</p>
+                            </div>
+                            <CheckCircle className="h-8 w-8 text-green-200" />
+                        </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-xl p-4 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-yellow-100 text-sm">Event Mendatang</p>
+                                <p className="text-2xl font-bold">{dashboardStats.upcomingEvents}</p>
+                            </div>
+                            <Clock className="h-8 w-8 text-yellow-200" />
+                        </div>
+                    </div>
+                    
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl p-4 text-white">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-purple-100 text-sm">Event Selesai</p>
+                                <p className="text-2xl font-bold">{dashboardStats.completedEvents}</p>
+                            </div>
+                            <Award className="h-8 w-8 text-purple-200" />
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -1152,20 +1462,18 @@ export default function HomePage() {
                         <div className="lg:col-span-2">
                             <CalendarWidget />
                         </div>
-                        <div className="space-y-8">
-                            <SkillWidget />
-                            <div>
-                                <h2 className="text-xl font-semibold mb-4">Aspirasi Mahasiswa</h2>
-                                <div className="p-4 bg-white rounded-lg shadow-md">
-                                    <AspirationForm />
-                                </div>
-                            </div>
-                            <div>
-                               <h2 className="text-xl font-semibold mb-4">Dibuat Untuk Anda</h2>
-                                <div className="text-center p-10 bg-white rounded-lg shadow-md">
-                                   <p className="text-gray-500">Fitur Rekomendasi akan datang.</p>
-                               </div>
-                           </div>
+                        <div className="space-y-6">
+                            <EventStatsWidget />
+                        </div>
+                    </div>
+
+                    {/* Analytics Section */}
+                    <div className="mt-8">
+                        <h2 className="text-2xl font-semibold mb-6 text-gray-900">Analytics & Progress</h2>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <ActivityChart />
+                            <SkillProgressWidget />
+                            <ParticipationChart />
                         </div>
                     </div>
                 </div>

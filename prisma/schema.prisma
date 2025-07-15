@@ -46,6 +46,7 @@ model Organisasi {
   category      String?
   memberships   Membership[]
   events        Event[]
+  aspirations   Aspirasi[]
 }
 
 model Event {
@@ -106,13 +107,24 @@ model Membership {
 
 // ========= MODEL BARU UNTUK ASPIRASI =========
 model Aspirasi {
-  id        String   @id @default(cuid())
-  content   String   @db.Text
-  category  String
-  sentiment String?
-  createdAt DateTime @default(now())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String          @id @default(cuid())
+  content      String          @db.Text
+  category     String
+  status       AspirationStatus @default(PENDING)
+  response     String?         @db.Text
+  sentiment    String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @default(now()) @updatedAt
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizerId  String?
+  organizer    Organisasi?     @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+}
+
+enum AspirationStatus {
+  PENDING
+  REVIEWED
+  RESPONDED
 }
 // ===========================================
 
@@ -146,7 +158,7 @@ model User {
   favoriteEvents FavoriteEvent[]
   feedback       Feedback[]
   committeeRoles Committee[]
-  aspirasi       Aspirasi[] // <-- Tambahkan relasi baru ini
+  aspirasi       Aspirasi[] // Student aspirations
 }
 
 model JadwalKuliah {

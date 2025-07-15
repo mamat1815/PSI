@@ -18,9 +18,9 @@ export default async function OrganizationDashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="min-h-screen bg-[#F8F9FA]">
       <OrganizationSidebar />
-      <main className="flex-grow bg-[#F8F9FA]">
+      <main className="ml-80 min-h-screen">
         {children}
       </main>
     </div>

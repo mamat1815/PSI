@@ -16,10 +16,12 @@ export default async function StudentDashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-gray-50">
       <StudentSidebar />
-      <main className="flex-grow bg-[#F8F9FA]">
-        {children}
+      <main className="flex-grow bg-gray-50 relative z-0 overflow-y-auto ml-0 md:ml-80">
+        <div className="pl-6 pr-8 py-6 min-h-screen">
+          {children}
+        </div>
       </main>
     </div>
   );

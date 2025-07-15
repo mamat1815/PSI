@@ -11,4 +11,18 @@ export const userRouter = createTRPCRouter({
       select: { skills: { select: { name: true } } }
     });
   }),
+
+  getOrganizations: protectedProcedure.query(async ({ ctx }) => {
+    if (ctx.session.user.role !== "Mahasiswa") {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    
+    return ctx.db.organisasi.findMany({
+      select: {
+        id: true,
+        name: true,
+      },
+      orderBy: { name: "asc" },
+    });
+  }),
 });
