@@ -12,6 +12,20 @@ datasource db {
 enum Role {
   Mahasiswa
   StaffKampus
+  Organisasi
+  SuperAdmin
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
 }
 
 enum MembershipRole {
@@ -44,9 +58,15 @@ model Organisasi {
   logo          String?
   contact       String?
   category      String?
+  subscriptionPlan SubscriptionPlan @default(FREE)
+  subscriptionExpiry DateTime?
   memberships   Membership[]
   events        Event[]
   aspirations   Aspirasi[]
+  subscriptions Subscription[]
+  payments      Payment[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @default(now()) @updatedAt
 }
 
 model Event {
@@ -69,6 +89,7 @@ model Event {
   favoriteBy       FavoriteEvent[]
   feedback         Feedback[]
   committee        Committee[]
+  analytics        EventAnalytics[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @default(now()) @updatedAt
 }
@@ -159,6 +180,7 @@ model User {
   feedback       Feedback[]
   committeeRoles Committee[]
   aspirasi       Aspirasi[] // Student aspirations
+  analytics      EventAnalytics[]
 }
 
 model JadwalKuliah {
@@ -213,4 +235,51 @@ model FavoriteEvent {
   eventId   String
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   @@unique([userId, eventId])
+}
+
+// ========= SUBSCRIPTION & PAYMENT MODELS =========
+model Subscription {
+  id            String           @id @default(cuid())
+  plan          SubscriptionPlan
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean          @default(true)
+  organizationId String
+  organization  Organisasi       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payments      Payment[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @default(now()) @updatedAt
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  amount          Float
+  currency        String        @default("IDR")
+  status          PaymentStatus @default(PENDING)
+  midtransOrderId String        @unique
+  midtransTransactionId String?
+  paymentMethod   String?
+  paidAt          DateTime?
+  organizationId  String
+  organization    Organisasi    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionId  String?
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @default(now()) @updatedAt
+}
+
+model EventAnalytics {
+  id          String   @id @default(cuid())
+  eventId     String
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String   // "view", "share", "like", "register"
+  metadata    Json?    // Additional data like source, duration, etc.
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+  
+  @@index([eventId, action])
+  @@index([userId])
 }

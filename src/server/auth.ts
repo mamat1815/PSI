@@ -9,18 +9,18 @@ declare module "next-auth" {
   interface Session extends DefaultSession {
     user: {
       id: string;
-      role: "Mahasiswa" | "StaffKampus" | "Organisasi";
+      role: "Mahasiswa" | "StaffKampus" | "Organisasi" | "SuperAdmin";
     } & DefaultSession["user"];
   }
   interface User {
-    role?: "Mahasiswa" | "StaffKampus" | "Organisasi";
+    role?: "Mahasiswa" | "StaffKampus" | "Organisasi" | "SuperAdmin";
   }
 }
 
 declare module "@auth/core/jwt" {
   interface JWT {
     id: string;
-    role: "Mahasiswa" | "StaffKampus" | "Organisasi";
+    role: "Mahasiswa" | "StaffKampus" | "Organisasi" | "SuperAdmin";
   }
 }
 
@@ -36,7 +36,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "Mahasiswa" | "StaffKampus" | "Organisasi";
+        session.user.role = token.role as "Mahasiswa" | "StaffKampus" | "Organisasi" | "SuperAdmin";
       }
       return session;
     },

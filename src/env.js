@@ -18,6 +18,10 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
+    // Midtrans Configuration
+    MIDTRANS_SERVER_KEY: z.string().optional(),
+    MIDTRANS_CLIENT_KEY: z.string().optional(),
+    MIDTRANS_IS_PRODUCTION: z.string().transform((val) => val === "true").optional(),
   },
 
   /**
@@ -40,6 +44,10 @@ export const env = createEnv({
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
+    // Midtrans Environment Variables
+    MIDTRANS_SERVER_KEY: process.env.MIDTRANS_SERVER_KEY || "SB-Mid-server-temp",
+    MIDTRANS_CLIENT_KEY: process.env.MIDTRANS_CLIENT_KEY || "SB-Mid-client-temp",
+    MIDTRANS_IS_PRODUCTION: process.env.MIDTRANS_IS_PRODUCTION || "false",
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

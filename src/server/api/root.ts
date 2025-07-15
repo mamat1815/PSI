@@ -10,6 +10,8 @@ import { userRouter } from "./routers/user";
 import { feedbackRouter } from "./routers/feedback";
 import { recommendationRouter } from "./routers/recommendation";
 import { dashboardRouter } from "./routers/dashboard";
+import { subscriptionRouter } from "./routers/subscription";
+import { adminRouter } from "./routers/admin";
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -22,6 +24,8 @@ export const appRouter = createTRPCRouter({
   feedback: feedbackRouter,
   recommendation: recommendationRouter,
   dashboard: dashboardRouter,
+  subscription: subscriptionRouter,
+  admin: adminRouter,
   
 });
 

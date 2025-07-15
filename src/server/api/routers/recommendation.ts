@@ -12,12 +12,13 @@ const generateEventRecommendations = async (
   organizationType: string,
   targetAudience: string,
   budget: string,
-  category?: string
+  category?: string,
+  subscriptionPlan: string = "FREE"
 ) => {
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
-    const prompt = `
+    const basePrompt = `
 Kamu adalah AI assistant untuk organisasi mahasiswa. Buatkan TEPAT 3 rekomendasi event yang kreatif dan praktis.
 
 INPUT:
@@ -25,7 +26,23 @@ INPUT:
 - Target Audience: ${targetAudience}
 - Budget Range: ${budget}
 ${category ? `- Kategori Fokus: ${category}` : ''}
+- Subscription Plan: ${subscriptionPlan}
+`;
 
+    let enhancedPrompt = basePrompt;
+
+    if (subscriptionPlan === "PRO") {
+      enhancedPrompt += `
+ENHANCED FEATURES (PRO):
+- Berikan rekomendasi yang lebih detail dan spesifik
+- Sertakan strategi marketing dan engagement yang advanced
+- Tambahkan analytics metrics yang bisa ditrack
+- Berikan insight tentang timing terbaik dan trend terkini
+- Sertakan competitive analysis dan unique selling points
+`;
+    }
+
+    enhancedPrompt += `
 OUTPUT:
 Berikan respons dalam format JSON array yang valid dengan struktur berikut untuk setiap event:
 
@@ -43,142 +60,41 @@ Berikan respons dalam format JSON array yang valid dengan struktur berikut untuk
     "targetAudience": "${targetAudience}",
     "objectives": ["Tujuan 1", "Tujuan 2", "Tujuan 3"],
     "requirements": ["Requirement 1", "Requirement 2", "Requirement 3"],
-    "tips": ["Tips 1", "Tips 2"],
+    "tips": ["Tips 1", "Tips 2"],${subscriptionPlan === "PRO" ? `
+    "marketingStrategy": ["Strategi 1", "Strategi 2", "Strategi 3"],
+    "engagementTactics": ["Taktik 1", "Taktik 2"],
+    "analyticsToTrack": ["Metrik 1", "Metrik 2", "Metrik 3"],
+    "competitiveAdvantage": "Keunggulan unik event ini",
+    "optimalTiming": "Timing terbaik untuk event",` : ""}
     "trending": false,
-    "aiGenerated": true
+    "aiGenerated": true,
+    "subscriptionLevel": "${subscriptionPlan}"
   }
 ]
+`;
 
-RULES:
-1. Kategori harus salah satu: "Teknologi & IT", "Bisnis & Kewirausahaan", "Kesehatan & Wellness", "Lingkungan & Sosial", "Seni & Kreativitas"
-2. Difficulty: "Mudah", "Sedang", atau "Sulit"
-3. Event harus sesuai budget ${budget}
-4. Relevan untuk ${targetAudience}
-5. ID format: "ai-1", "ai-2", "ai-3"
-6. HANYA JSON array, tidak ada teks lain
-
-JSON:`;
-
-    const result = await model.generateContent(prompt);
+    const result = await model.generateContent(enhancedPrompt);
     const response = await result.response;
     const text = response.text();
     
-    // Parse JSON response from Gemini
+    // Clean and parse JSON response
+    const cleanedText = text.replace(/```json\s*|\s*```/g, '').trim();
+    
     try {
-      // Clean up the response text to extract JSON
-      let cleanText = text.trim();
-      
-      // Remove any text before the JSON array
-      const jsonStart = cleanText.indexOf('[');
-      const jsonEnd = cleanText.lastIndexOf(']');
-      
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
-      }
-      
-      // Remove markdown code blocks if present
-      cleanText = cleanText.replace(/```json\n?/g, '').replace(/\n?```/g, '');
-      cleanText = cleanText.replace(/```\n?/g, '');
-      
-      const recommendations = JSON.parse(cleanText);
-      return Array.isArray(recommendations) ? recommendations : [recommendations];
+      const recommendations = JSON.parse(cleanedText);
+      return Array.isArray(recommendations) ? recommendations : [];
     } catch (parseError) {
-      // Fallback to manual parsing if JSON is malformed
-      console.log("Gemini response:", text);
-      console.log("Parse error:", parseError);
-      throw new Error("Failed to parse AI response");
+      console.error("JSON parsing error:", parseError);
+      console.error("Response text:", text);
+      return [];
     }
     
   } catch (error) {
     console.error("Gemini AI Error:", error);
-    
-    // Fallback recommendations if AI fails
-    return [
-      {
-        id: "ai-fallback-1",
-        title: "Workshop Inovasi Digital",
-        description: "Workshop hands-on untuk mengeksplorasi teknologi digital terbaru dan implementasinya dalam kehidupan sehari-hari. Peserta akan belajar tools dan teknik praktis.",
-        category: "Teknologi & IT",
-        estimatedParticipants: "40-60 orang",
-        duration: "1 hari",
-        budget: budget,
-        difficulty: "Sedang",
-        tags: ["Workshop", "Digital", "Innovation", "Technology", "Learning"],
-        targetAudience: targetAudience,
-        objectives: [
-          "Memahami tren teknologi digital terkini",
-          "Mengembangkan mindset inovatif",
-          "Networking dengan praktisi industri"
-        ],
-        requirements: [
-          "Laptop/tablet untuk praktik",
-          "Koneksi internet stabil",
-          "Ruangan dengan proyektor"
-        ],
-        tips: [
-          "Undang speaker yang berpengalaman di industri",
-          "Sediakan sesi tanya jawab interaktif"
-        ],
-        trending: false,
-        aiGenerated: true
-      },
-      {
-        id: "ai-fallback-2",
-        title: "Community Service Program",
-        description: "Program layanan masyarakat untuk membantu komunitas lokal dengan berbagai kegiatan sosial dan edukasi. Menggabungkan aksi nyata dengan pembelajaran.",
-        category: "Lingkungan & Sosial",
-        estimatedParticipants: "30-50 orang",
-        duration: "1 hari",
-        budget: budget,
-        difficulty: "Mudah",
-        tags: ["Community", "Service", "Social", "Education", "Impact"],
-        targetAudience: targetAudience,
-        objectives: [
-          "Memberikan dampak positif bagi masyarakat",
-          "Mengembangkan kepedulian sosial",
-          "Membangun karakter kepemimpinan"
-        ],
-        requirements: [
-          "Partnership dengan komunitas lokal",
-          "Transportasi untuk peserta",
-          "Peralatan kegiatan sosial"
-        ],
-        tips: [
-          "Koordinasi yang baik dengan pihak terkait",
-          "Dokumentasi kegiatan untuk evaluasi"
-        ],
-        trending: false,
-        aiGenerated: true
-      },
-      {
-        id: "ai-fallback-3",
-        title: "Creative Skills Workshop",
-        description: "Workshop pengembangan kreativitas dengan berbagai aktivitas seni dan desain. Peserta akan belajar teknik-teknik kreatif untuk mengekspresikan ide.",
-        category: "Seni & Kreativitas",
-        estimatedParticipants: "25-40 orang",
-        duration: "4 jam",
-        budget: budget,
-        difficulty: "Mudah",
-        tags: ["Creative", "Art", "Design", "Workshop", "Skills"],
-        targetAudience: targetAudience,
-        objectives: [
-          "Mengembangkan kemampuan kreatif",
-          "Belajar teknik seni dan desain",
-          "Networking dengan komunitas kreatif"
-        ],
-        requirements: [
-          "Studio atau ruang kreatif",
-          "Peralatan seni dan desain",
-          "Instruktur berpengalaman"
-        ],
-        tips: [
-          "Sediakan berbagai media kreatif",
-          "Ciptakan atmosfer yang inspiratif"
-        ],
-        trending: false,
-        aiGenerated: true
-      }
-    ];
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Failed to generate AI recommendations"
+    });
   }
 };
 
@@ -204,19 +120,76 @@ export const recommendationRouter = createTRPCRouter({
       category: z.string().optional(),
       interests: z.array(z.string()).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
+        const { user } = ctx.session;
+        let subscriptionPlan = "FREE"; // Default to FREE
+        
+        // Check user's organization subscription
+        if (user.role === "Organisasi") {
+          const organization = await ctx.db.organisasi.findFirst({
+            where: { email: user.email! },
+            select: {
+              subscriptionPlan: true,
+              subscriptionExpiry: true
+            }
+          });
+          
+          if (organization) {
+            // Check if subscription is still active
+            const now = new Date();
+            const isExpired = organization.subscriptionExpiry && organization.subscriptionExpiry < now;
+            
+            if (!isExpired && organization.subscriptionPlan === "PRO") {
+              subscriptionPlan = "PRO";
+            }
+          }
+        } else {
+          // For students/staff, check their organization membership
+          const userWithMembership = await ctx.db.user.findUnique({
+            where: { id: user.id },
+            include: {
+              memberships: {
+                include: {
+                  organization: {
+                    select: {
+                      subscriptionPlan: true,
+                      subscriptionExpiry: true
+                    }
+                  }
+                }
+              }
+            }
+          });
+
+          if (userWithMembership?.memberships && userWithMembership.memberships.length > 0) {
+            const org = userWithMembership.memberships[0]?.organization;
+            if (org) {
+              const now = new Date();
+              const isExpired = org.subscriptionExpiry && org.subscriptionExpiry < now;
+              
+              if (!isExpired && org.subscriptionPlan === "PRO") {
+                subscriptionPlan = "PRO";
+              }
+            }
+          }
+        }
+
         const recommendations = await generateEventRecommendations(
           input.organizationType,
           input.targetAudience,
           input.budget,
-          input.category
+          input.category,
+          subscriptionPlan
         );
 
         return {
           success: true,
           recommendations: recommendations,
-          message: "AI recommendations generated successfully"
+          subscriptionPlan: subscriptionPlan,
+          message: subscriptionPlan === "PRO" 
+            ? "Enhanced AI recommendations generated with PRO features" 
+            : "Basic AI recommendations generated. Upgrade to PRO for advanced features"
         };
       } catch (error) {
         console.error("Error generating AI recommendations:", error);

@@ -4,7 +4,7 @@
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, Settings, LogOut, BarChart, Users, MessageSquare, Lightbulb, Brain } from "lucide-react";
+import { LayoutDashboard, Calendar, Settings, LogOut, BarChart, Users, MessageSquare, Lightbulb, Brain, Crown } from "lucide-react";
 
 export default function OrganizationSidebar() {
     const { data: session } = useSession();
@@ -17,6 +17,7 @@ export default function OrganizationSidebar() {
         { href: "/aspirasi-org", label: "Aspirasi Masuk", icon: MessageSquare },
         { href: "/rekomendasi-ai", label: "AI Rekomendasi", icon: Brain },
         { href: "/dashboard/report", label: "Laporan", icon: BarChart },
+        { href: "/subscription", label: "Berlangganan", icon: Crown },
     ];
 
     return (
