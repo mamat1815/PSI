@@ -3,11 +3,53 @@
 
 import { useState, useMemo } from "react";
 import { api } from "~/trpc/react";
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Award, Building, Search, Loader2, Send, CheckCircle, Filter, Users, Star, AlertTriangle, Info, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Award, Building, Search, Loader2, Send, CheckCircle, Filter, Users, Star, AlertTriangle, Info, X, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { checkEventConflict, formatConflictMessage, type ScheduleItem } from "~/utils/scheduleConflict";
 
 const dayNameToIndex: Record<string, number> = { "senin": 1, "selasa": 2, "rabu": 3, "kamis": 4, "jumat": 5, "sabtu": 6, "minggu": 0 };
+
+// Utility function to generate Google Calendar URL
+const generateGoogleCalendarUrl = (event: any, startTime?: string, endTime?: string) => {
+    const eventDate = new Date(event.date);
+    
+    // If we have specific times, use them; otherwise use the event date
+    let startDateTime: Date;
+    let endDateTime: Date;
+    
+    if (startTime && endTime) {
+        const [startHour = 0, startMinute = 0] = startTime.split(':').map(Number);
+        const [endHour = 0, endMinute = 0] = endTime.split(':').map(Number);
+        
+        startDateTime = new Date(eventDate);
+        startDateTime.setHours(startHour, startMinute, 0, 0);
+
+        endDateTime = new Date(eventDate);
+        endDateTime.setHours(endHour, endMinute, 0, 0);
+    } else {
+        startDateTime = new Date(eventDate);
+        endDateTime = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000); // Default 2 hours duration
+    }
+    
+    // Format dates for Google Calendar (YYYYMMDDTHHMMSSZ)
+    const formatDateForGoogle = (date: Date) => {
+        return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+    };
+    
+    const startFormatted = formatDateForGoogle(startDateTime);
+    const endFormatted = formatDateForGoogle(endDateTime);
+    
+    const params = new URLSearchParams({
+        action: 'TEMPLATE',
+        text: event.title,
+        dates: `${startFormatted}/${endFormatted}`,
+        details: event.description || '',
+        location: event.location || '',
+        ctz: 'Asia/Jakarta'
+    });
+    
+    return `https://calendar.google.com/calendar/render?${params.toString()}`;
+};
 
 // Event Registration Confirmation Modal
 const EventRegistrationModal = ({ 
@@ -256,6 +298,19 @@ const EventRegistrationModal = ({
                         )}
                     </button>
                 </div>
+                
+                {/* Add to Google Calendar button after successful registration */}
+                {event.isRegistered && (
+                    <div className="p-4 border-t bg-blue-50">
+                        <button
+                            onClick={() => window.open(generateGoogleCalendarUrl(event, event.timeStart, event.timeEnd), '_blank')}
+                            className="w-full py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium flex items-center justify-center gap-2 transition-colors"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            Tambah ke Google Calendar
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -266,11 +321,11 @@ const CalendarWidget = () => {
     const [hoveredDate, setHoveredDate] = useState<number | null>(null);
 
     const { data: jadwalKuliah } = api.jadwal.getMine.useQuery();
-    const { data: events } = api.event.getPublic.useQuery();
+    const { data: myEvents } = api.event.getStudentEvents.useQuery();
 
     const monthSchedules = useMemo(() => {
         const schedules = new Map<number, any[]>();
-        if (!jadwalKuliah && !events) return schedules;
+        if (!jadwalKuliah && !myEvents) return schedules;
 
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
@@ -281,16 +336,36 @@ const CalendarWidget = () => {
             const dayOfWeek = date.getDay();
             const dailySchedules: any[] = [];
 
+            // Add jadwal kuliah
             jadwalKuliah?.forEach(j => {
                 if (dayNameToIndex[j.hari.toLowerCase()] === dayOfWeek) {
-                    dailySchedules.push({ type: 'kuliah', title: j.mataKuliah, time: `${j.jamMulai} - ${j.jamSelesai}` });
+                    dailySchedules.push({ 
+                        type: 'kuliah', 
+                        title: j.mataKuliah, 
+                        time: `${j.jamMulai} - ${j.jamSelesai}`,
+                        color: 'bg-blue-500/80'
+                    });
                 }
             });
 
-            events?.forEach(e => {
-                const eventDate = new Date(e.date);
+            // Add only my registered events (tidak termasuk event publik yang belum didaftarkan)
+            myEvents?.forEach(participation => {
+                const eventDate = new Date(participation.event.date);
                 if (eventDate.getDate() === day && eventDate.getMonth() === month && eventDate.getFullYear() === year) {
-                    dailySchedules.push({ type: 'event', title: e.title, time: eventDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) });
+                    const statusColor = participation.status === 'ACCEPTED' ? 'bg-green-500/80' : 
+                                      participation.status === 'PENDING' ? 'bg-yellow-500/80' : 'bg-red-500/80';
+                    
+                    dailySchedules.push({ 
+                        type: 'my-event', 
+                        title: participation.event.title, 
+                        time: participation.event.timeStart && participation.event.timeEnd ? 
+                              `${participation.event.timeStart} - ${participation.event.timeEnd}` : 
+                              eventDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                        color: statusColor,
+                        status: participation.status,
+                        event: participation.event,
+                        location: participation.event.location
+                    });
                 }
             });
 
@@ -299,7 +374,7 @@ const CalendarWidget = () => {
             }
         }
         return schedules;
-    }, [currentDate, jadwalKuliah, events]);
+    }, [currentDate, jadwalKuliah, myEvents]);
 
     const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
     const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
@@ -328,16 +403,64 @@ const CalendarWidget = () => {
                                 {date}
                             </div>
                             {hoveredDate === date && schedules && (
-                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-64 bg-slate-800 text-white p-3 rounded-lg shadow-xl z-10 pointer-events-none">
+                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-80 bg-slate-800 text-white p-3 rounded-lg shadow-xl z-10 pointer-events-auto">
                                     <p className="font-bold mb-2 border-b border-b-gray-600 pb-1">Jadwal untuk tanggal {hoveredDate}</p>
-                                    <ul className="space-y-1 text-xs">
+                                    <ul className="space-y-2 text-xs max-h-40 overflow-y-auto">
                                         {schedules.map((s, i) => (
-                                            <li key={i} className={`p-1.5 rounded flex items-center gap-2 ${s.type === 'kuliah' ? 'bg-blue-500/80' : 'bg-green-500/80'}`}>
-                                                <span className="font-semibold">{s.title}</span>
-                                                <span>({s.time})</span>
+                                            <li key={i} className={`p-2 rounded flex items-center justify-between gap-2 ${s.color}`}>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-semibold">{s.title}</span>
+                                                        {s.status && (
+                                                            <span className={`px-1 py-0.5 rounded text-xs ${
+                                                                s.status === 'ACCEPTED' ? 'bg-green-200 text-green-800' :
+                                                                s.status === 'PENDING' ? 'bg-yellow-200 text-yellow-800' :
+                                                                'bg-red-200 text-red-800'
+                                                            }`}>
+                                                                {s.status === 'ACCEPTED' ? 'Diterima' : 
+                                                                 s.status === 'PENDING' ? 'Menunggu' : 'Ditolak'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-gray-200 text-xs">
+                                                        {s.time}
+                                                        {s.location && (
+                                                            <span className="ml-2">📍 {s.location}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {s.type === 'my-event' && s.status === 'ACCEPTED' && (
+                                                    <button
+                                                        onClick={() => window.open(generateGoogleCalendarUrl(s.event, s.event.timeStart, s.event.timeEnd), '_blank')}
+                                                        className="ml-2 p-1 bg-white/20 hover:bg-white/30 rounded transition-colors"
+                                                        title="Tambah ke Google Calendar"
+                                                    >
+                                                        <ExternalLink className="h-3 w-3" />
+                                                    </button>
+                                                )}
                                             </li>
                                         ))}
                                     </ul>
+                                    <div className="mt-2 pt-2 border-t border-gray-600 text-xs text-gray-300">
+                                        <div className="flex gap-3 text-xs">
+                                            <span className="flex items-center gap-1">
+                                                <div className="w-2 h-2 bg-blue-500 rounded"></div>
+                                                Kuliah
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <div className="w-2 h-2 bg-green-500 rounded"></div>
+                                                Event Diterima
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <div className="w-2 h-2 bg-yellow-500 rounded"></div>
+                                                Event Pending
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <div className="w-2 h-2 bg-red-500 rounded"></div>
+                                                Event Ditolak
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -628,13 +751,22 @@ const DetailedEventCard = ({ event }: { event: any }) => {
                         )}
 
                         {isRegistered || registerMutation.isSuccess ? (
-                            <button 
-                                disabled 
-                                className="w-full py-2 px-4 rounded-lg bg-green-100 text-green-700 font-semibold flex items-center justify-center gap-2"
-                            >
-                                <CheckCircle className="h-5 w-5" />
-                                Berhasil Terdaftar
-                            </button>
+                            <div className="space-y-2">
+                                <button 
+                                    disabled 
+                                    className="w-full py-2 px-4 rounded-lg bg-green-100 text-green-700 font-semibold flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle className="h-5 w-5" />
+                                    Berhasil Terdaftar
+                                </button>
+                                <button
+                                    onClick={() => window.open(generateGoogleCalendarUrl(event, event.timeStart, event.timeEnd), '_blank')}
+                                    className="w-full py-2 px-4 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    <ExternalLink className="h-4 w-4" />
+                                    Tambah ke Google Calendar
+                                </button>
+                            </div>
                         ) : (
                             <button 
                                 onClick={handleRegisterClick} 
@@ -663,6 +795,93 @@ const DetailedEventCard = ({ event }: { event: any }) => {
                 error={registerMutation.error?.message || null}
             />
         </>
+    );
+};
+
+// Component untuk menampilkan event yang sudah didaftarkan mahasiswa
+const MyEventCard = ({ participation }: { participation: any }) => {
+    const event = participation.event;
+    
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'ACCEPTED': return 'bg-green-100 text-green-700 border-green-200';
+            case 'PENDING': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'REJECTED': return 'bg-red-100 text-red-700 border-red-200';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    };
+    
+    const getStatusText = (status: string) => {
+        switch (status) {
+            case 'ACCEPTED': return 'Diterima';
+            case 'PENDING': return 'Menunggu';
+            case 'REJECTED': return 'Ditolak';
+            default: return status;
+        }
+    };
+
+    return (
+        <div className="p-3 rounded-lg border bg-white flex flex-col gap-4">
+            <div className="w-full h-32 bg-gray-200 rounded-md overflow-hidden">
+                <img 
+                    src={event.image || `https://placehold.co/600x400/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`} 
+                    alt={event.title} 
+                    className="w-full h-full object-cover rounded-md"
+                    onError={(e) => {
+                        e.currentTarget.src = `https://placehold.co/600x400/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`;
+                    }}
+                />
+            </div>
+            <div className="flex-grow">
+                <p className="font-bold text-sm text-yellow-500">{event.title}</p>
+                <p className="text-xs text-gray-500">{event.organizer.name}</p>
+                
+                {/* Status Badge */}
+                <div className={`mt-2 px-2 py-1 rounded-full text-xs font-medium border inline-block ${getStatusColor(participation.status)}`}>
+                    {getStatusText(participation.status)}
+                </div>
+                
+                <div className="mt-2 space-y-1 text-xs text-gray-600">
+                    <p className="flex items-center gap-2">
+                        <Clock className="h-3 w-3"/>
+                        {event.timeStart && event.timeEnd 
+                            ? `${event.timeStart} - ${event.timeEnd}`
+                            : new Date(event.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                        }
+                    </p>
+                    <p className="flex items-center gap-2">
+                        <Calendar className="h-3 w-3"/>
+                        {new Date(event.date).toLocaleDateString('id-ID', { 
+                            weekday: 'short', 
+                            year: 'numeric', 
+                            month: 'short', 
+                            day: 'numeric' 
+                        })}
+                    </p>
+                    <p className="flex items-center gap-2"><MapPin className="h-3 w-3"/>{event.location}</p>
+                </div>
+            </div>
+            <div className="flex-shrink-0">
+                {participation.status === 'ACCEPTED' && (
+                    <button
+                        onClick={() => window.open(generateGoogleCalendarUrl(event, event.timeStart, event.timeEnd), '_blank')}
+                        className="w-full py-2 rounded-md bg-blue-500 hover:bg-blue-600 text-white text-sm flex items-center justify-center gap-1 transition-colors"
+                    >
+                        <ExternalLink className="h-3 w-3"/> Google Calendar
+                    </button>
+                )}
+                {participation.status === 'PENDING' && (
+                    <div className="w-full py-2 rounded-md bg-yellow-100 text-yellow-700 text-sm text-center border border-yellow-200">
+                        Menunggu Konfirmasi
+                    </div>
+                )}
+                {participation.status === 'REJECTED' && (
+                    <div className="w-full py-2 rounded-md bg-red-100 text-red-700 text-sm text-center border border-red-200">
+                        Pendaftaran Ditolak
+                    </div>
+                )}
+            </div>
+        </div>
     );
 };
 
@@ -751,9 +970,17 @@ const EventCard = ({ event }: { event: any }) => {
                 </div>
                 <div className="flex-shrink-0">
                     {isRegistered || registerMutation.isSuccess ? (
-                        <button disabled className="w-full py-2 rounded-md bg-green-100 text-green-700 font-semibold flex items-center justify-center gap-2">
-                            <CheckCircle className="h-5 w-5"/> Terdaftar
-                        </button>
+                        <div className="space-y-2">
+                            <button disabled className="w-full py-2 rounded-md bg-green-100 text-green-700 font-semibold flex items-center justify-center gap-2">
+                                <CheckCircle className="h-5 w-5"/> Terdaftar
+                            </button>
+                            <button
+                                onClick={() => window.open(generateGoogleCalendarUrl(event, event.timeStart, event.timeEnd), '_blank')}
+                                className="w-full py-1 rounded-md bg-blue-500 hover:bg-blue-600 text-white text-sm flex items-center justify-center gap-1 transition-colors"
+                            >
+                                <ExternalLink className="h-3 w-3"/> Google Calendar
+                            </button>
+                        </div>
                     ) : (
                         <button 
                             onClick={handleRegisterClick} 
@@ -816,10 +1043,25 @@ const AspirationForm = () => {
 
 export default function HomePage() {
     const { data: sessionData } = api.auth.getSession.useQuery();
-    const { data: events, isLoading } = api.event.getPublic.useQuery();
+    const { data: events, isLoading: eventsLoading } = api.event.getPublic.useQuery();
+    const { data: myEvents, isLoading: myEventsLoading } = api.event.getStudentEvents.useQuery();
     const [activeTab, setActiveTab] = useState<'home' | 'search'>('home');
 
     const session = sessionData?.session;
+
+    // Filter untuk event yang akan datang dan sudah diterima
+    const upcomingMyEvents = useMemo(() => {
+        if (!myEvents) return [];
+        
+        const now = new Date();
+        return myEvents
+            .filter(participation => {
+                const eventDate = new Date(participation.event.date);
+                return eventDate >= now && participation.status === 'ACCEPTED';
+            })
+            .sort((a, b) => new Date(a.event.date).getTime() - new Date(b.event.date).getTime())
+            .slice(0, 5); // Ambil maksimal 5 event terdekat
+    }, [myEvents]);
 
     const tabs = [
         { id: 'home' as const, name: 'Beranda', icon: Building },
@@ -871,9 +1113,38 @@ export default function HomePage() {
             {activeTab === 'home' && (
                 <div>
                     <div>
-                        <h2 className="text-xl font-semibold mb-4">Acara Terdekat Anda</h2>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-semibold">Acara Aktif Anda</h2>
+                            <Link 
+                                href="/my-events" 
+                                className="text-sm text-yellow-600 hover:text-yellow-700 font-medium flex items-center gap-1"
+                            >
+                                Lihat Semua
+                                <ChevronRight className="h-4 w-4" />
+                            </Link>
+                        </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                            {isLoading ? <Loader2 className="animate-spin"/> : events?.map(event => <EventCard key={event.id} event={event} />)}
+                            {myEventsLoading ? (
+                                <Loader2 className="animate-spin"/>
+                            ) : upcomingMyEvents.length > 0 ? (
+                                upcomingMyEvents.map(participation => (
+                                    <MyEventCard key={participation.event.id} participation={participation} />
+                                ))
+                            ) : (
+                                <div className="col-span-full text-center py-12 bg-white rounded-lg shadow-md">
+                                    <Calendar className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                                    <h3 className="text-lg font-medium text-gray-700 mb-2">Belum ada event aktif</h3>
+                                    <p className="text-gray-500 mb-4">Anda belum mendaftar atau belum memiliki event yang diterima.</p>
+                                    <Link 
+                                        href="#" 
+                                        onClick={() => setActiveTab('search')}
+                                        className="inline-flex items-center px-4 py-2 bg-yellow-500 text-gray-900 rounded-lg hover:bg-yellow-400 transition-colors"
+                                    >
+                                        <Search className="h-4 w-4 mr-2" />
+                                        Cari Event
+                                    </Link>
+                                </div>
+                            )}
                         </div>
                     </div>
 

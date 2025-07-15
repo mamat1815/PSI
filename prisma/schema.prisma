@@ -22,6 +22,12 @@ enum MembershipRole {
   Anggota
 }
 
+enum ParticipantStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
 model Skill {
   id     String  @id @default(cuid())
   name   String  @unique
@@ -58,7 +64,8 @@ model Event {
   skills           Skill[]     @relation("EventSkills")
   organizerId      String
   organizer        Organisasi  @relation(fields: [organizerId], references: [id], onDelete: Cascade)
-  participants     User[]      @relation("EventParticipants")
+  participants     EventParticipant[]
+  favoriteBy       FavoriteEvent[]
   feedback         Feedback[]
   committee        Committee[]
   createdAt        DateTime    @default(now())
@@ -109,6 +116,18 @@ model Aspirasi {
 }
 // ===========================================
 
+model EventParticipant {
+  id        String            @id @default(cuid())
+  status    ParticipantStatus @default(PENDING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @default(now()) @updatedAt
+  eventId   String
+  event     Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([eventId, userId])
+}
+
 model User {
   id             String       @id @default(cuid())
   name           String?
@@ -123,7 +142,8 @@ model User {
   sessions       Session[]
   jadwalKuliah   JadwalKuliah[]
   memberships    Membership[]
-  events         Event[]      @relation("EventParticipants")
+  eventParticipations EventParticipant[]
+  favoriteEvents FavoriteEvent[]
   feedback       Feedback[]
   committeeRoles Committee[]
   aspirasi       Aspirasi[] // <-- Tambahkan relasi baru ini
@@ -171,4 +191,14 @@ model VerificationToken {
   token      String   @unique
   expires    DateTime
   @@unique([identifier, token])
+}
+
+model FavoriteEvent {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  @@unique([userId, eventId])
 }

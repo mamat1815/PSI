@@ -4,7 +4,7 @@
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, Settings, LogOut, BarChart } from "lucide-react";
+import { LayoutDashboard, Calendar, Settings, LogOut, BarChart, Users } from "lucide-react";
 
 export default function OrganizationSidebar() {
     const { data: session } = useSession();
@@ -13,6 +13,7 @@ export default function OrganizationSidebar() {
     const navLinks = [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/dashboard/manajemen", label: "Manajemen", icon: Calendar },
+        { href: "/events", label: "Events & Peserta", icon: Users },
         { href: "/dashboard/report", label: "Laporan", icon: BarChart },
     ];
 

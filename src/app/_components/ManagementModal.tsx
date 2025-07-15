@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { api } from "~/trpc/react";
-import { Loader2, X, CalendarPlus, Upload, Clock, Users, Camera } from "lucide-react";
+import { Loader2, X, CalendarPlus, Upload, Clock, Users, Camera, Trash2 } from "lucide-react";
 import CreatableSelect from 'react-select/creatable';
 
 const initialFormData = { 
@@ -22,9 +22,10 @@ export default function ManagementModal({ isOpen, onClose, initialData = null }:
     const utils = api.useUtils();
     const [formData, setFormData] = useState(initialFormData);
     const [selectedSkills, setSelectedSkills] = useState<readonly { value: string; label: string; }[]>([]);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     
     const { data: skillsOptions, isLoading: skillsLoading } = api.skill.getAll.useQuery(undefined, {
-      select: (data) => data.map(skill => ({ value: skill.name, label: skill.name }))
+      select: (data) => data.map((skill: any) => ({ value: skill.name, label: skill.name }))
     });
 
     useEffect(() => {
@@ -50,8 +51,15 @@ export default function ManagementModal({ isOpen, onClose, initialData = null }:
         }
     }, [initialData, isOpen]);
 
-    const createEventMutation = api.event.create.useMutation({ onSuccess: () => { utils.event.getAll.invalidate(); onClose(); } });
-    const updateEventMutation = api.event.update.useMutation({ onSuccess: () => { utils.event.getAll.invalidate(); onClose(); } });
+    const createEventMutation = api.event.create.useMutation({ onSuccess: () => { utils.event.getAll.invalidate(); utils.event.getOrgEvents.invalidate(); onClose(); } });
+    const updateEventMutation = api.event.update.useMutation({ onSuccess: () => { utils.event.getAll.invalidate(); utils.event.getOrgEvents.invalidate(); onClose(); } });
+    const deleteEventMutation = api.event.delete.useMutation({ 
+        onSuccess: () => { 
+            utils.event.getAll.invalidate(); 
+            utils.event.getOrgEvents.invalidate(); 
+            onClose(); 
+        } 
+    });
     const createSkillMutation = api.skill.create.useMutation({ onSuccess: () => { utils.skill.getAll.invalidate(); }});
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setFormData(prev => ({...prev, [e.target.name]: e.target.value}));
@@ -91,9 +99,56 @@ export default function ManagementModal({ isOpen, onClose, initialData = null }:
         await createSkillMutation.mutateAsync({ name: inputValue });
     }, [createSkillMutation]);
 
-    const isLoading = createEventMutation.isPending || updateEventMutation.isPending;
+    const handleDeleteEvent = () => {
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDeleteEvent = () => {
+        if (initialData?.id) {
+            deleteEventMutation.mutate({ id: initialData.id });
+        }
+        setShowDeleteConfirm(false);
+    };
+
+    const isLoading = createEventMutation.isPending || updateEventMutation.isPending || deleteEventMutation.isPending;
 
     if (!isOpen) return null;
+
+    // Modal konfirmasi delete
+    const DeleteConfirmModal = () => {
+        if (!showDeleteConfirm) return null;
+        
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-60">
+                <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Konfirmasi Hapus Event
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                        Apakah Anda yakin ingin menghapus event "{formData.title}"? 
+                        Tindakan ini tidak dapat dibatalkan dan semua data peserta akan terhapus.
+                    </p>
+                    <div className="flex justify-end gap-3">
+                        <button
+                            onClick={() => setShowDeleteConfirm(false)}
+                            disabled={deleteEventMutation.isPending}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                        >
+                            Batal
+                        </button>
+                        <button
+                            onClick={confirmDeleteEvent}
+                            disabled={deleteEventMutation.isPending}
+                            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {deleteEventMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                            {deleteEventMutation.isPending ? 'Menghapus...' : 'Hapus Event'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
@@ -199,11 +254,26 @@ export default function ManagementModal({ isOpen, onClose, initialData = null }:
                         />
                     </div>
                 </div>
-                <footer className="p-4 border-t flex justify-end items-center gap-3 bg-gray-50 rounded-b-2xl">
-                    <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Batal</button>
-                    <button onClick={() => handleSubmit('DRAFT')} disabled={isLoading} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border rounded-md hover:bg-gray-100 flex items-center gap-2">{isLoading && <Loader2 className="h-4 w-4 animate-spin"/>}Simpan sebagai Draft</button>
-                    <button onClick={() => handleSubmit('PUBLISHED')} disabled={isLoading} className="px-6 py-2 text-sm font-semibold text-white rounded-md flex items-center gap-2 bg-gray-800 hover:bg-gray-700">{isLoading && <Loader2 className="h-4 w-4 animate-spin"/>}Publikasikan</button>
+                <footer className="p-4 border-t flex justify-between items-center bg-gray-50 rounded-b-2xl">
+                    <div>
+                        {initialData && (
+                            <button 
+                                onClick={handleDeleteEvent} 
+                                disabled={isLoading}
+                                className="px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 disabled:opacity-50 flex items-center gap-2"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                                Hapus Event
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Batal</button>
+                        <button onClick={() => handleSubmit('DRAFT')} disabled={isLoading} className="px-4 py-2 text-sm font-semibold text-gray-700 bg-white border rounded-md hover:bg-gray-100 flex items-center gap-2">{isLoading && <Loader2 className="h-4 w-4 animate-spin"/>}Simpan sebagai Draft</button>
+                        <button onClick={() => handleSubmit('PUBLISHED')} disabled={isLoading} className="px-6 py-2 text-sm font-semibold text-white rounded-md flex items-center gap-2 bg-gray-800 hover:bg-gray-700">{isLoading && <Loader2 className="h-4 w-4 animate-spin"/>}Publikasikan</button>
+                    </div>
                 </footer>
+                <DeleteConfirmModal />
             </div>
         </div>
     );

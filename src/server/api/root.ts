@@ -7,6 +7,7 @@ import { reportRouter } from "~/server/api/routers/report";
 import { aspirationRouter } from "~/server/api/routers/aspiration";
 import { jadwalRouter } from "./routers/jadwal";
 import { userRouter } from "./routers/user";
+import { feedbackRouter } from "./routers/feedback";
 
 export const appRouter = createTRPCRouter({
   auth: authRouter,
@@ -16,6 +17,7 @@ export const appRouter = createTRPCRouter({
   aspiration: aspirationRouter,
   jadwal: jadwalRouter,
   user:userRouter,
+  feedback: feedbackRouter,
   
 });
 

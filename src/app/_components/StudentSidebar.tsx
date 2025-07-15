@@ -4,7 +4,7 @@
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Calendar, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Calendar, Settings, LogOut, Star } from "lucide-react";
 
 export default function StudentSidebar() {
     const { data: session } = useSession();
@@ -13,6 +13,7 @@ export default function StudentSidebar() {
     const navLinks = [
         { href: "/home", label: "Dashboard", icon: LayoutDashboard },
         { href: "/jadwal", label: "Jadwal Kuliah", icon: Calendar },
+        { href: "/my-events", label: "Event Saya", icon: Star },
     ];
 
     return (

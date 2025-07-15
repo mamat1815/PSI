@@ -18,7 +18,7 @@ async function testConnection() {
         console.log("Hasil query waktu server:", res.rows[0]);
     } catch (err) {
         console.error("❌ Gagal terhubung ke database!");
-        console.error("Error:", err.message);
+        console.error("Error:", err instanceof Error ? err.message : String(err));
     } finally {
         await client.end();
     }
