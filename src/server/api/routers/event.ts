@@ -66,12 +66,31 @@ export const eventRouter = createTRPCRouter({
     });
   }),
 
-  getPublic: publicProcedure.query(({ ctx }) => {
-    return ctx.db.event.findMany({
+  getPublic: publicProcedure.query(async ({ ctx }) => {
+    const userId = ctx.session?.user?.id;
+    
+    const events = await ctx.db.event.findMany({
       where: { status: 'PUBLISHED', date: { gte: new Date() } },
-      include: { organizer: { select: { name: true } } },
+      include: { 
+        organizer: { select: { name: true } },
+        skills: true,
+        participants: userId ? { 
+          select: { id: true },
+          where: { id: userId }
+        } : false,
+        _count: {
+          select: { participants: true }
+        }
+      },
       orderBy: { date: 'asc' },
     });
+
+    // Tambahkan field isRegistered untuk setiap event
+    return events.map(event => ({
+      ...event,
+      isRegistered: userId ? 
+        event.participants.some(p => p.id === userId) : false,
+    }));
   }),
 
   // Prosedur untuk mendaftarkan user ke sebuah event
@@ -81,12 +100,57 @@ export const eventRouter = createTRPCRouter({
       if (ctx.session.user.role !== "Mahasiswa") {
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
+
+      // Cek apakah event ada dan ambil data lengkap
+      const event = await ctx.db.event.findUnique({
+        where: { id: input.eventId },
+        include: {
+          participants: true,
+        },
+      });
+
+      if (!event) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Event tidak ditemukan" });
+      }
+
+      // Cek apakah sudah terdaftar
+      const isAlreadyRegistered = event.participants.some(
+        (participant) => participant.id === ctx.session.user.id
+      );
+
+      if (isAlreadyRegistered) {
+        throw new TRPCError({ 
+          code: "BAD_REQUEST", 
+          message: "Anda sudah terdaftar untuk event ini" 
+        });
+      }
+
+      // Cek deadline registrasi
+      if (event.registrationDeadline && new Date() > event.registrationDeadline) {
+        throw new TRPCError({ 
+          code: "BAD_REQUEST", 
+          message: "Batas waktu pendaftaran telah berakhir" 
+        });
+      }
+
+      // Cek kapasitas maksimum
+      if (event.maxParticipants && event.participants.length >= event.maxParticipants) {
+        throw new TRPCError({ 
+          code: "BAD_REQUEST", 
+          message: "Event sudah mencapai kapasitas maksimum" 
+        });
+      }
+
+      // Daftarkan user ke event
       return ctx.db.event.update({
         where: { id: input.eventId },
         data: {
           participants: {
             connect: { id: ctx.session.user.id },
           },
+        },
+        include: {
+          participants: true,
         },
       });
     }),
@@ -95,7 +159,12 @@ export const eventRouter = createTRPCRouter({
       title: z.string().min(3),
       description: z.string(),
       date: z.date(),
+      timeStart: z.string(),
+      timeEnd: z.string(),
       location: z.string().min(1),
+      image: z.string().nullable().optional(),
+      maxParticipants: z.number().nullable().optional(),
+      registrationDeadline: z.date().nullable().optional(),
       skills: z.array(z.object({ value: z.string(), label: z.string() })),
       status: z.enum(['DRAFT', 'PUBLISHED']),
     }))
@@ -117,7 +186,12 @@ export const eventRouter = createTRPCRouter({
         title: z.string().min(3), 
         description: z.string(), 
         date: z.date(), 
+        timeStart: z.string(),
+        timeEnd: z.string(),
         location: z.string().min(1), 
+        image: z.string().nullable().optional(),
+        maxParticipants: z.number().nullable().optional(),
+        registrationDeadline: z.date().nullable().optional(),
         skills: z.array(z.object({ value: z.string(), label: z.string() })),
         status: z.enum(['DRAFT', 'PUBLISHED']) 
     }))

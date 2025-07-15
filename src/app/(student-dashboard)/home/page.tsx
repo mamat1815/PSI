@@ -3,10 +3,263 @@
 
 import { useState, useMemo } from "react";
 import { api } from "~/trpc/react";
-import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Award, Building, Search, Loader2, Send, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, MapPin, Clock, Award, Building, Search, Loader2, Send, CheckCircle, Filter, Users, Star, AlertTriangle, Info, X } from "lucide-react";
 import Link from "next/link";
+import { checkEventConflict, formatConflictMessage, type ScheduleItem } from "~/utils/scheduleConflict";
 
 const dayNameToIndex: Record<string, number> = { "senin": 1, "selasa": 2, "rabu": 3, "kamis": 4, "jumat": 5, "sabtu": 6, "minggu": 0 };
+
+// Event Registration Confirmation Modal
+const EventRegistrationModal = ({ 
+    event, 
+    isOpen, 
+    onClose, 
+    onConfirm, 
+    isLoading = false,
+    scheduleConflict = null,
+    error = null
+}: {
+    event: any;
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    isLoading?: boolean;
+    scheduleConflict?: any;
+    error?: string | null;
+}) => {
+    if (!isOpen) return null;
+
+    const currentParticipants = event.registrations?.length || 0;
+    const isNearCapacity = event.maxParticipants && currentParticipants >= event.maxParticipants * 0.8;
+    const isFull = event.maxParticipants && currentParticipants >= event.maxParticipants;
+    
+    const registrationDeadlinePassed = event.registrationDeadline && new Date(event.registrationDeadline) < new Date();
+    const eventDate = new Date(event.date);
+    const today = new Date();
+    const daysUntilEvent = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="flex items-center justify-between p-6 border-b">
+                    <h2 className="text-xl font-bold text-gray-900">Konfirmasi Pendaftaran Event</h2>
+                    <button 
+                        onClick={onClose}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    >
+                        <X className="h-5 w-5 text-gray-500" />
+                    </button>
+                </div>
+
+                {/* Event Details */}
+                <div className="p-6 space-y-4">
+                    {/* Event Image */}
+                    <div className="w-full h-40 bg-gray-200 rounded-lg overflow-hidden">
+                        <img 
+                            src={event.image || `https://placehold.co/600x400/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`} 
+                            alt={event.title} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                                e.currentTarget.src = `https://placehold.co/600x400/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`;
+                            }}
+                        />
+                    </div>
+
+                    {/* Event Info */}
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">{event.title}</h3>
+                        <p className="text-sm text-gray-600 mb-3">{event.organizer.name}</p>
+                        
+                        <div className="space-y-2 text-sm text-gray-700">
+                            <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-gray-500" />
+                                <span>{eventDate.toLocaleDateString('id-ID', { 
+                                    weekday: 'long', 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                })}</span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-gray-500" />
+                                <span>
+                                    {event.timeStart && event.timeEnd 
+                                        ? `${event.timeStart} - ${event.timeEnd}`
+                                        : eventDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                                    }
+                                </span>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-gray-500" />
+                                <span>{event.location}</span>
+                            </div>
+
+                            {event.maxParticipants && (
+                                <div className="flex items-center gap-2">
+                                    <Users className="h-4 w-4 text-gray-500" />
+                                    <span>
+                                        {currentParticipants} / {event.maxParticipants} peserta
+                                        {isNearCapacity && !isFull && (
+                                            <span className="ml-1 text-orange-600 font-medium">(Hampir penuh)</span>
+                                        )}
+                                        {isFull && (
+                                            <span className="ml-1 text-red-600 font-medium">(Penuh)</span>
+                                        )}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Description */}
+                        {event.description && (
+                            <div className="mt-3">
+                                <p className="text-sm text-gray-600">{event.description}</p>
+                            </div>
+                        )}
+
+                        {/* Skills Required */}
+                        {event.skills && event.skills.length > 0 && (
+                            <div className="mt-3">
+                                <p className="text-sm font-medium text-gray-700 mb-2">Skills yang dibutuhkan:</p>
+                                <div className="flex flex-wrap gap-1">
+                                    {event.skills.map((skill: any) => (
+                                        <span key={skill.name} className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                            {skill.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Warnings and Info */}
+                    <div className="space-y-3">
+                        {/* Error Message */}
+                        {error && (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium text-red-800">Pendaftaran Gagal</p>
+                                        <p className="text-xs text-red-700 mt-1">{error}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Schedule Conflict Warning */}
+                        {scheduleConflict?.hasConflict && (
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium text-red-800">Konflik Jadwal Terdeteksi</p>
+                                        <p className="text-xs text-red-700 mt-1">
+                                            Event ini bertabrakan dengan jadwal kuliah Anda. Pastikan Anda dapat mengatur waktu dengan baik.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Registration Deadline Warning */}
+                        {event.registrationDeadline && (
+                            <div className={`p-3 rounded-lg border ${
+                                registrationDeadlinePassed 
+                                    ? 'bg-red-50 border-red-200' 
+                                    : daysUntilEvent <= 2 
+                                        ? 'bg-orange-50 border-orange-200' 
+                                        : 'bg-blue-50 border-blue-200'
+                            }`}>
+                                <div className="flex items-start gap-2">
+                                    <Info className={`h-5 w-5 flex-shrink-0 mt-0.5 ${
+                                        registrationDeadlinePassed 
+                                            ? 'text-red-500' 
+                                            : daysUntilEvent <= 2 
+                                                ? 'text-orange-500' 
+                                                : 'text-blue-500'
+                                    }`} />
+                                    <div>
+                                        <p className={`text-sm font-medium ${
+                                            registrationDeadlinePassed 
+                                                ? 'text-red-800' 
+                                                : daysUntilEvent <= 2 
+                                                    ? 'text-orange-800' 
+                                                    : 'text-blue-800'
+                                        }`}>
+                                            Batas Pendaftaran
+                                        </p>
+                                        <p className={`text-xs mt-1 ${
+                                            registrationDeadlinePassed 
+                                                ? 'text-red-700' 
+                                                : daysUntilEvent <= 2 
+                                                    ? 'text-orange-700' 
+                                                    : 'text-blue-700'
+                                        }`}>
+                                            {registrationDeadlinePassed 
+                                                ? 'Batas pendaftaran telah lewat'
+                                                : `Hingga ${new Date(event.registrationDeadline).toLocaleDateString('id-ID')}`
+                                            }
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Capacity Warning */}
+                        {isNearCapacity && !isFull && (
+                            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="text-sm font-medium text-orange-800">Kapasitas Hampir Penuh</p>
+                                        <p className="text-xs text-orange-700 mt-1">
+                                            Tersisa {event.maxParticipants - currentParticipants} slot pendaftaran.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Footer / Action Buttons */}
+                <div className="flex gap-3 p-6 border-t bg-gray-50">
+                    <button
+                        onClick={onClose}
+                        disabled={isLoading}
+                        className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                    >
+                        Batal
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={isLoading || isFull || registrationDeadlinePassed}
+                        className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                            scheduleConflict?.hasConflict 
+                                ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                                : 'bg-yellow-500 hover:bg-yellow-600 text-gray-900'
+                        }`}
+                    >
+                        {isLoading ? (
+                            <div className="flex items-center justify-center gap-2">
+                                <Loader2 className="animate-spin h-4 w-4" />
+                                Mendaftarkan...
+                            </div>
+                        ) : (
+                            isFull ? 'Event Penuh' :
+                            registrationDeadlinePassed ? 'Batas Waktu Lewat' :
+                            scheduleConflict?.hasConflict ? 'Daftar (Ada Konflik)' : 'Konfirmasi Daftar'
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const CalendarWidget = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -95,36 +348,439 @@ const CalendarWidget = () => {
     );
 };
 
-const EventCard = ({ event }: { event: any }) => {
-    const utils = api.useUtils();
-    const registerMutation = api.event.register.useMutation({
-        onSuccess: () => { utils.event.getPublic.invalidate(); }
-    });
-    const [isRegistered, setIsRegistered] = useState(false);
-    const handleRegister = () => { setIsRegistered(true); registerMutation.mutate({ eventId: event.id }); };
+const EventSearchTab = () => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('');
+    const [showFilters, setShowFilters] = useState(false);
+
+    const { data: events, isLoading } = api.event.getPublic.useQuery();
+
+    const filteredEvents = useMemo(() => {
+        if (!events) return [];
+        
+        return events.filter(event => {
+            const matchesSearch = searchQuery === '' || 
+                event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                event.organizer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                event.location.toLowerCase().includes(searchQuery.toLowerCase());
+            
+            const matchesCategory = selectedCategory === '' || 
+                (event.organizer as any).category === selectedCategory;
+            
+            return matchesSearch && matchesCategory;
+        });
+    }, [events, searchQuery, selectedCategory]);
+
+    const categories = useMemo(() => {
+        if (!events) return [];
+        const cats = events.map(e => (e.organizer as any).category).filter(Boolean);
+        return [...new Set(cats)];
+    }, [events]);
 
     return (
-        <div className="p-3 rounded-lg border bg-white flex flex-col gap-4">
-            <div className="w-full h-32 bg-gray-200 rounded-md">
-                <img src={`https://placehold.co/600x400/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`} alt={event.title} className="w-full h-full object-cover rounded-md"/>
-            </div>
-            <div className="flex-grow">
-                <p className="font-bold text-sm text-yellow-500">{event.title}</p>
-                <p className="text-xs text-gray-500">{event.organizer.name}</p>
-                <div className="mt-2 space-y-1 text-xs text-gray-600">
-                    <p className="flex items-center gap-2"><Clock className="h-3 w-3"/>{new Date(event.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</p>
-                    <p className="flex items-center gap-2"><Calendar className="h-3 w-3"/>{new Date(event.date).toLocaleDateString()}</p>
-                    <p className="flex items-center gap-2"><MapPin className="h-3 w-3"/>{event.location}</p>
+        <div className="space-y-6">
+            {/* Search and Filter Bar */}
+            <div className="bg-white p-4 rounded-lg shadow-md">
+                <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Cari event berdasarkan nama, organizer, atau lokasi..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-transparent"
+                        />
+                    </div>
+                    <button
+                        onClick={() => setShowFilters(!showFilters)}
+                        className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50"
+                    >
+                        <Filter className="h-4 w-4" />
+                        Filter
+                    </button>
                 </div>
-            </div>
-            <div className="flex-shrink-0">
-                {isRegistered || registerMutation.isSuccess ? (
-                    <button disabled className="w-full py-2 rounded-md bg-green-100 text-green-700 font-semibold flex items-center justify-center gap-2"><CheckCircle className="h-5 w-5"/> Terdaftar</button>
-                ) : (
-                    <button onClick={handleRegister} disabled={registerMutation.isPending} className="w-full py-2 rounded-md bg-gray-800 text-white font-semibold hover:bg-gray-700">{registerMutation.isPending ? <Loader2 className="animate-spin"/> : 'Detail'}</button>
+
+                {showFilters && (
+                    <div className="mt-4 p-4 border-t">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Kategori Organisasi
+                                </label>
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value)}
+                                    className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-yellow-400"
+                                >
+                                    <option value="">Semua Kategori</option>
+                                    {categories.map(category => (
+                                        <option key={category} value={category}>{category}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex items-end">
+                                <button
+                                    onClick={() => {
+                                        setSearchQuery('');
+                                        setSelectedCategory('');
+                                    }}
+                                    className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+                                >
+                                    Reset Filter
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
+
+            {/* Results Summary */}
+            <div className="flex justify-between items-center">
+                <p className="text-gray-600">
+                    Menampilkan {filteredEvents.length} dari {events?.length || 0} event
+                </p>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Star className="h-4 w-4" />
+                    Event yang tersedia untuk pendaftaran
+                </div>
+            </div>
+
+            {/* Events Grid */}
+            {isLoading ? (
+                <div className="flex justify-center items-center py-12">
+                    <Loader2 className="animate-spin h-8 w-8 text-yellow-500" />
+                </div>
+            ) : filteredEvents.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-lg shadow-md">
+                    <Search className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        Tidak ada event ditemukan
+                    </h3>
+                    <p className="text-gray-500">
+                        Coba ubah kata kunci pencarian atau filter yang digunakan
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredEvents.map(event => (
+                        <DetailedEventCard key={event.id} event={event} />
+                    ))}
+                </div>
+            )}
         </div>
+    );
+};
+
+const DetailedEventCard = ({ event }: { event: any }) => {
+    const utils = api.useUtils();
+    const { data: jadwalKuliah } = api.jadwal.getMine.useQuery();
+    
+    const registerMutation = api.event.register.useMutation({
+        onSuccess: () => { 
+            utils.event.getPublic.invalidate();
+            setShowModal(false);
+        },
+        onError: (error) => {
+            // Handle error dari server
+            console.error("Registration error:", error.message);
+        }
+    });
+    const [showModal, setShowModal] = useState(false);
+    
+    // Gunakan isRegistered dari API response
+    const isRegistered = event.isRegistered || registerMutation.isSuccess;
+    
+    // Check for schedule conflicts
+    const scheduleConflict = useMemo(() => {
+        if (!jadwalKuliah || !event.timeStart || !event.timeEnd) return null;
+        
+        const scheduleItems: ScheduleItem[] = jadwalKuliah.map(j => ({
+            hari: j.hari,
+            jamMulai: j.jamMulai,
+            jamSelesai: j.jamSelesai,
+            mataKuliah: j.mataKuliah,
+            type: 'kuliah' as const
+        }));
+
+        return checkEventConflict({
+            date: new Date(event.date),
+            timeStart: event.timeStart,
+            timeEnd: event.timeEnd,
+            title: event.title
+        }, scheduleItems);
+    }, [jadwalKuliah, event]);
+    
+    const handleRegisterClick = () => { 
+        setShowModal(true);
+    };
+
+    const handleConfirmRegister = () => {
+        registerMutation.mutate({ eventId: event.id });
+    };
+
+    return (
+        <>
+            <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                <div className="h-48 bg-gray-200">
+                    <img 
+                        src={event.image || `https://placehold.co/400x300/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`} 
+                        alt={event.title} 
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                            e.currentTarget.src = `https://placehold.co/400x300/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`;
+                        }}
+                    />
+                </div>
+                
+                <div className="p-4">
+                    <div className="mb-3">
+                        <h3 className="font-bold text-lg text-gray-900 mb-1">{event.title}</h3>
+                        <p className="text-sm text-yellow-600 font-medium">{event.organizer.name}</p>
+                        {(event.organizer as any).category && (
+                            <span className="inline-block mt-1 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                {(event.organizer as any).category}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="space-y-2 mb-4 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-yellow-500" />
+                            <span>{new Date(event.date).toLocaleDateString('id-ID', { 
+                                weekday: 'long', 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                            })}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-yellow-500" />
+                            <span>
+                                {event.timeStart && event.timeEnd 
+                                    ? `${event.timeStart} - ${event.timeEnd}`
+                                    : new Date(event.date).toLocaleTimeString('id-ID', { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                    })
+                                }
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-yellow-500" />
+                            <span className="truncate">{event.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-yellow-500" />
+                            <span>
+                                {event._count?.participants || 0} peserta terdaftar
+                                {event.maxParticipants && ` / ${event.maxParticipants} maksimal`}
+                            </span>
+                        </div>
+                        
+                        {/* Schedule Conflict Warning */}
+                        {scheduleConflict?.hasConflict && (
+                            <div className="p-2 bg-red-50 border border-red-200 rounded-md">
+                                <div className="flex items-start gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5" />
+                                    <div className="text-red-700">
+                                        <p className="font-medium text-xs">Konflik Jadwal!</p>
+                                        <p className="text-xs">{formatConflictMessage(scheduleConflict.conflicts)}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Registration Deadline */}
+                        {event.registrationDeadline && (
+                            <div className="p-2 bg-blue-50 border border-blue-200 rounded-md">
+                                <div className="flex items-center gap-2">
+                                    <Info className="h-4 w-4 text-blue-500" />
+                                    <span className="text-blue-700 text-xs">
+                                        Batas pendaftaran: {new Date(event.registrationDeadline).toLocaleDateString('id-ID')}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <p className="text-sm text-gray-700 mb-4 line-clamp-3">
+                        {event.description}
+                    </p>
+
+                    <div className="space-y-2">
+                        {event.skills && event.skills.length > 0 && (
+                            <div>
+                                <p className="text-xs font-medium text-gray-500 mb-1">Skills yang dibutuhkan:</p>
+                                <div className="flex flex-wrap gap-1">
+                                    {event.skills.slice(0, 3).map((skill: any) => (
+                                        <span key={skill.name} className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">
+                                            {skill.name}
+                                        </span>
+                                    ))}
+                                    {event.skills.length > 3 && (
+                                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+                                            +{event.skills.length - 3} lainnya
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {isRegistered || registerMutation.isSuccess ? (
+                            <button 
+                                disabled 
+                                className="w-full py-2 px-4 rounded-lg bg-green-100 text-green-700 font-semibold flex items-center justify-center gap-2"
+                            >
+                                <CheckCircle className="h-5 w-5" />
+                                Berhasil Terdaftar
+                            </button>
+                        ) : (
+                            <button 
+                                onClick={handleRegisterClick} 
+                                disabled={registerMutation.isPending}
+                                className={`w-full py-2 px-4 rounded-lg font-semibold transition-colors disabled:opacity-50 ${
+                                    scheduleConflict?.hasConflict 
+                                        ? 'bg-orange-400 hover:bg-orange-500 text-white' 
+                                        : 'bg-yellow-400 hover:bg-yellow-500 text-gray-900'
+                                }`}
+                            >
+                                {scheduleConflict?.hasConflict ? 'Daftar (Ada Konflik)' : 'Daftar Event'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Registration Confirmation Modal */}
+            <EventRegistrationModal
+                event={event}
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                onConfirm={handleConfirmRegister}
+                isLoading={registerMutation.isPending}
+                scheduleConflict={scheduleConflict}
+                error={registerMutation.error?.message || null}
+            />
+        </>
+    );
+};
+
+const EventCard = ({ event }: { event: any }) => {
+    const utils = api.useUtils();
+    const { data: jadwalKuliah } = api.jadwal.getMine.useQuery();
+    
+    const registerMutation = api.event.register.useMutation({
+        onSuccess: () => { 
+            utils.event.getPublic.invalidate();
+            setShowModal(false);
+        },
+        onError: (error) => {
+            // Handle error dari server
+            console.error("Registration error:", error.message);
+        }
+    });
+    const [showModal, setShowModal] = useState(false);
+    
+    // Gunakan isRegistered dari API response
+    const isRegistered = event.isRegistered || registerMutation.isSuccess;
+    
+    // Check for schedule conflicts for this simple card too
+    const scheduleConflict = useMemo(() => {
+        if (!jadwalKuliah || !event.timeStart || !event.timeEnd) return null;
+        
+        const scheduleItems: ScheduleItem[] = jadwalKuliah.map(j => ({
+            hari: j.hari,
+            jamMulai: j.jamMulai,
+            jamSelesai: j.jamSelesai,
+            mataKuliah: j.mataKuliah,
+            type: 'kuliah' as const
+        }));
+
+        return checkEventConflict({
+            date: new Date(event.date),
+            timeStart: event.timeStart,
+            timeEnd: event.timeEnd,
+            title: event.title
+        }, scheduleItems);
+    }, [jadwalKuliah, event]);
+
+    const handleRegisterClick = () => { 
+        setShowModal(true);
+    };
+
+    const handleConfirmRegister = () => {
+        registerMutation.mutate({ eventId: event.id });
+    };
+
+    return (
+        <>
+            <div className="p-3 rounded-lg border bg-white flex flex-col gap-4">
+                <div className="w-full h-32 bg-gray-200 rounded-md overflow-hidden">
+                    <img 
+                        src={event.image || `https://placehold.co/600x400/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`} 
+                        alt={event.title} 
+                        className="w-full h-full object-cover rounded-md"
+                        onError={(e) => {
+                            e.currentTarget.src = `https://placehold.co/600x400/FBBF24/1E293B?text=${encodeURIComponent(event.title)}`;
+                        }}
+                    />
+                </div>
+                <div className="flex-grow">
+                    <p className="font-bold text-sm text-yellow-500">{event.title}</p>
+                    <p className="text-xs text-gray-500">{event.organizer.name}</p>
+                    <div className="mt-2 space-y-1 text-xs text-gray-600">
+                        <p className="flex items-center gap-2">
+                            <Clock className="h-3 w-3"/>
+                            {event.timeStart && event.timeEnd 
+                                ? `${event.timeStart} - ${event.timeEnd}`
+                                : new Date(event.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                            }
+                        </p>
+                        <p className="flex items-center gap-2"><Calendar className="h-3 w-3"/>{new Date(event.date).toLocaleDateString()}</p>
+                        <p className="flex items-center gap-2"><MapPin className="h-3 w-3"/>{event.location}</p>
+                        
+                        {/* Show conflict indicator for simple cards too */}
+                        {scheduleConflict?.hasConflict && (
+                            <p className="flex items-center gap-2 text-red-600">
+                                <AlertTriangle className="h-3 w-3"/>
+                                Konflik jadwal
+                            </p>
+                        )}
+                    </div>
+                </div>
+                <div className="flex-shrink-0">
+                    {isRegistered || registerMutation.isSuccess ? (
+                        <button disabled className="w-full py-2 rounded-md bg-green-100 text-green-700 font-semibold flex items-center justify-center gap-2">
+                            <CheckCircle className="h-5 w-5"/> Terdaftar
+                        </button>
+                    ) : (
+                        <button 
+                            onClick={handleRegisterClick} 
+                            disabled={registerMutation.isPending} 
+                            className={`w-full py-2 rounded-md font-semibold hover:opacity-90 transition-colors ${
+                                scheduleConflict?.hasConflict 
+                                    ? 'bg-orange-500 text-white' 
+                                    : 'bg-gray-800 text-white hover:bg-gray-700'
+                            }`}
+                        >
+                            {registerMutation.isPending ? <Loader2 className="animate-spin"/> : 'Daftar'}
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Registration Confirmation Modal */}
+            <EventRegistrationModal
+                event={event}
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                onConfirm={handleConfirmRegister}
+                isLoading={registerMutation.isPending}
+                scheduleConflict={scheduleConflict}
+                error={registerMutation.error?.message || null}
+            />
+        </>
     );
 };
 
@@ -161,8 +817,14 @@ const AspirationForm = () => {
 export default function HomePage() {
     const { data: sessionData } = api.auth.getSession.useQuery();
     const { data: events, isLoading } = api.event.getPublic.useQuery();
+    const [activeTab, setActiveTab] = useState<'home' | 'search'>('home');
 
     const session = sessionData?.session;
+
+    const tabs = [
+        { id: 'home' as const, name: 'Beranda', icon: Building },
+        { id: 'search' as const, name: 'Cari Event', icon: Search },
+    ];
 
     return (
         <div className="p-8">
@@ -175,34 +837,70 @@ export default function HomePage() {
                     <button className="p-3 rounded-full bg-white shadow-md"><Search className="h-6 w-6 text-gray-600"/></button>
                 </div>
             </header>
-            
-            <div>
-                <h2 className="text-xl font-semibold mb-4">Acara Terdekat Anda</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                    {isLoading ? <Loader2 className="animate-spin"/> : events?.map(event => <EventCard key={event.id} event={event} />)}
+
+            {/* Tab Navigation */}
+            <div className="mb-8">
+                <div className="border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-8">
+                        {tabs.map((tab) => {
+                            const Icon = tab.icon;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id)}
+                                    className={`group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
+                                        activeTab === tab.id
+                                            ? 'border-yellow-500 text-yellow-600'
+                                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    }`}
+                                >
+                                    <Icon
+                                        className={`-ml-0.5 mr-2 h-5 w-5 ${
+                                            activeTab === tab.id ? 'text-yellow-500' : 'text-gray-400 group-hover:text-gray-500'
+                                        }`}
+                                    />
+                                    {tab.name}
+                                </button>
+                            );
+                        })}
+                    </nav>
                 </div>
             </div>
 
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                    <CalendarWidget />
-                </div>
-                <div className="space-y-8">
-                    <SkillWidget />
+            {/* Tab Content */}
+            {activeTab === 'home' && (
+                <div>
                     <div>
-                        <h2 className="text-xl font-semibold mb-4">Aspirasi Mahasiswa</h2>
-                        <div className="p-4 bg-white rounded-lg shadow-md">
-                            <AspirationForm />
+                        <h2 className="text-xl font-semibold mb-4">Acara Terdekat Anda</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+                            {isLoading ? <Loader2 className="animate-spin"/> : events?.map(event => <EventCard key={event.id} event={event} />)}
                         </div>
                     </div>
-                    <div>
-                       <h2 className="text-xl font-semibold mb-4">Dibuat Untuk Anda</h2>
-                        <div className="text-center p-10 bg-white rounded-lg shadow-md">
-                           <p className="text-gray-500">Fitur Rekomendasi akan datang.</p>
-                       </div>
-                   </div>
+
+                    <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2">
+                            <CalendarWidget />
+                        </div>
+                        <div className="space-y-8">
+                            <SkillWidget />
+                            <div>
+                                <h2 className="text-xl font-semibold mb-4">Aspirasi Mahasiswa</h2>
+                                <div className="p-4 bg-white rounded-lg shadow-md">
+                                    <AspirationForm />
+                                </div>
+                            </div>
+                            <div>
+                               <h2 className="text-xl font-semibold mb-4">Dibuat Untuk Anda</h2>
+                                <div className="text-center p-10 bg-white rounded-lg shadow-md">
+                                   <p className="text-gray-500">Fitur Rekomendasi akan datang.</p>
+                               </div>
+                           </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {activeTab === 'search' && <EventSearchTab />}
         </div>
     );
 }

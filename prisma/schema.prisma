@@ -47,7 +47,12 @@ model Event {
   title            String
   description      String      @db.Text
   date             DateTime
+  timeStart        String      @default("09:00") // Format: "HH:MM" (e.g., "09:00")
+  timeEnd          String      @default("17:00") // Format: "HH:MM" (e.g., "17:00")
   location         String
+  image            String?     // URL gambar event
+  maxParticipants  Int?        // Batas maksimal peserta
+  registrationDeadline DateTime? // Batas waktu pendaftaran
   status           String      @default("DRAFT")
   aiRecommendation String?     @db.Text
   skills           Skill[]     @relation("EventSkills")
@@ -56,6 +61,8 @@ model Event {
   participants     User[]      @relation("EventParticipants")
   feedback         Feedback[]
   committee        Committee[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @default(now()) @updatedAt
 }
 
 model Committee {
