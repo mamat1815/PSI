@@ -38,7 +38,7 @@ export default function LoginPage() {
       if (userRole === "Organisasi") {
         router.push("/dashboard");
       } else if (userRole === "Mahasiswa") {
-        router.push("/home");
+        router.push("/");
       } else if (userRole === "StaffKampus") {
         router.push("/staff");
       } else {
